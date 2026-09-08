@@ -32,9 +32,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: '/admin', label: 'Overview' },
             { href: '/admin/approvals', label: 'Approvals' },
             { href: '/admin/members', label: 'Members' },
+            { href: '/admin/requests', label: 'Requests' },
+            { href: '/admin/dues', label: 'Dues' },
+            { href: '/admin/dues/reconcile', label: 'Reconcile' },
+            { href: '/admin/donations', label: 'Donations' },
+            { href: '/admin/funds', label: 'Funds' },
+            { href: '/admin/ledger', label: 'Ledger' },
             { href: '/admin/posts', label: 'Posts' },
             { href: '/admin/events', label: 'Events' },
             { href: '/admin/eboard', label: 'E-board' },
+            { href: '/admin/settings', label: 'Settings' },
           ]}
         />
         <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>

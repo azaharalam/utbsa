@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { updateProfile, updateVisibility } from '@/app/actions/profile';
 import { Card, Field, Button, Toggle, Notice, Avatar } from '@/components/ui';
+import GraduateBox from '@/components/money/graduate';
 import type { Member } from '@/lib/types';
 
 function Save({ label = 'Save changes' }: { label?: string }) {
@@ -131,6 +132,8 @@ export default function ProfileForm({ member }: { member: Member }) {
 
             <Save />
           </form>
+
+          <GraduateBox memberType={member.member_type} />
         </Card>
 
         <Card>

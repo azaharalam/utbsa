@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { getCurrentMember } from '@/lib/session';
 import { eventBySlug } from '@/lib/queries/content';
 import { Card, Pill } from '@/components/ui';
+import RsvpBox from '@/components/money/rsvp';
+import { myRsvp, eventHeadcount } from '@/lib/queries/tickets';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,12 @@ export default async function EventPage({ params }: { params: { slug: string } }
 
   const start = new Date(e.starts_at);
   const isPast = start < new Date();
+
+  const canRsvp = !!me && ['active', 'inactive', 'alumni'].includes(me.status);
+  const [existing, headcount] = await Promise.all([
+    canRsvp ? myRsvp(me!.id, e.id) : Promise.resolve(null),
+    eventHeadcount(e.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
@@ -46,11 +54,16 @@ export default async function EventPage({ params }: { params: { slug: string } }
 
       {e.description && <p className="whitespace-pre-line text-[15px] leading-relaxed">{e.description}</p>}
 
-      {!isPast && (
+      {!isPast && canRsvp && (
+        <RsvpBox eventId={e.id} existing={existing} headcount={headcount} />
+      )}
+
+      {!isPast && !canRsvp && (
         <div className="mt-8 rounded-xl border-2 border-dashed border-stitch bg-white/60 p-5">
-          <p className="mb-1 font-display font-bold">RSVP is coming</p>
+          <p className="mb-1 font-display font-bold">Sign in to RSVP</p>
           <p className="text-sm text-ink-mid">
-            For now, let us know in the WhatsApp group so we can count heads for food.
+            Members can tell us they are coming, and how many they are bringing, so we
+            order the right amount of food.
           </p>
         </div>
       )}

@@ -41,6 +41,7 @@ export default async function PortalLayout({ children }: { children: React.React
         <PortalNav
           items={[
             { href: '/portal', label: 'Dashboard' },
+            { href: '/portal/dues', label: 'My dues' },
             { href: '/portal/profile', label: 'My profile' },
             { href: '/portal/directory', label: 'Directory' },
           ]}

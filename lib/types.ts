@@ -25,6 +25,7 @@ export type Member = {
   show_department: boolean;
   show_hometown: boolean;
   in_directory: boolean;
+  household_id: string | null;
   status: MemberStatus;
   role: Role;
   email_verified_at: string | null;
