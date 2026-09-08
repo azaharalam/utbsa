@@ -7,6 +7,38 @@ import ExportButton from './export';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Members' };
 
+const LEVELS: Record<string, string> = {
+  undergrad: 'Undergraduate', masters: "Master's", phd: 'PhD', na: '',
+};
+
+const TYPES: Record<string, string> = {
+  student: 'Student', spouse: 'Spouse', faculty: 'Faculty',
+  alumni: 'Alum', community: 'Community',
+};
+
+/** "Student · PhD in Chemical Engineering · Joined Fall 2025" */
+function describe(m: {
+  member_type: string; student_level: string | null; department: string | null;
+  arrival_semester: string | null; arrival_year: number | null; created_at: string;
+}) {
+  const bits: string[] = [TYPES[m.member_type] ?? m.member_type];
+
+  const level = m.student_level ? LEVELS[m.student_level] : '';
+  if (level && m.department) bits.push(`${level} in ${m.department}`);
+  else if (level) bits.push(level);
+  else if (m.department) bits.push(m.department);
+
+  if (m.arrival_semester && m.arrival_year) {
+    const s = m.arrival_semester[0].toUpperCase() + m.arrival_semester.slice(1);
+    bits.push(`Joined ${s} ${m.arrival_year}`);
+  } else {
+    bits.push('Joined ' + new Date(m.created_at).toLocaleDateString('en-US',
+      { month: 'short', year: 'numeric' }));
+  }
+
+  return bits.join(' · ');
+}
+
 const tones: Record<string, string> = {
   active: 'green', pending: 'gold', rejected: 'red', inactive: 'grey', alumni: 'grey',
 };
@@ -59,19 +91,22 @@ export default async function Members({ searchParams }: { searchParams: { status
                   <div className="min-w-0">
                     <p className="truncate font-display text-[15px] font-bold">
                       {m.full_name}
-                      {m.role === 'admin' && <span className="ml-2 text-xs font-semibold text-genda">admin</span>}
+                      {m.role === 'admin' && (
+                        <span className="ml-2 text-xs font-semibold text-genda">(admin)</span>
+                      )}
                     </p>
-                    <p className="truncate text-xs text-ink-mid">{m.email}</p>
+                    <p className="truncate text-xs text-ink-mid">
+                      {m.email}
+                      {m.show_phone && m.phone ? ` | ${m.phone}` : ''}
+                    </p>
                     <p className="text-xs text-ink-mid">
-                      {[m.member_type, m.department].filter(Boolean).join(' · ')}
-                      {' · joined '}
-                      {new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                      {describe(m)}
                     </p>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Pill tone={tones[m.status]}>{m.status}</Pill>
-                  <MemberControls id={m.id} status={m.status} role={m.role} isSelf={m.id === me.id} />
+                  <MemberControls id={m.id} status={m.status} isSelf={m.id === me.id} />
                 </div>
               </div>
             </Card>

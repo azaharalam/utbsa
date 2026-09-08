@@ -51,18 +51,23 @@ export async function recordPayment(_p: FormState, fd: FormData): Promise<FormSt
     const cents = amount(fd);
     if (typeof cents === 'string') return { error: cents };
 
+    // Semester + year rather than a term picker. The term is created if it
+    // does not exist yet, so the treasurer never has to set one up first.
+    const season = String(fd.get('season') ?? '');
+    const year = Number(fd.get('year') ?? 0);
+    const termId = season && year ? await Dues.findOrCreateTerm(season, year) : null;
+
     await Dues.recordPayment(me, {
-      householdId: String(fd.get('household_id')),
+      memberId: String(fd.get('member_id')),
       amountCents: cents,
       method: String(fd.get('method') ?? 'cash') as PaymentMethod,
       paidOn: String(fd.get('paid_on') || today()),
-      termId: String(fd.get('term_id') ?? '') || null,
+      termId,
       fundId: String(fd.get('fund_id') ?? '') || null,
       note: String(fd.get('note') ?? '').trim() || null,
     });
 
     revalidatePath('/admin/dues');
-    revalidatePath('/admin/dues/reconcile');
     revalidatePath('/portal/dues');
     return { ok: 'Payment recorded.' };
   } catch (e) { return { error: (e as Error).message }; }
@@ -75,14 +80,14 @@ export async function waiveBalance(_p: FormState, fd: FormData): Promise<FormSta
     if (typeof cents === 'string') return { error: cents };
 
     await Dues.addAdjustment(me, {
-      householdId: String(fd.get('household_id')),
+      memberId: String(fd.get('member_id')),
       kind: (String(fd.get('kind') ?? 'waiver')) as AdjustmentKind,
       amountCents: cents,
       reason: String(fd.get('reason') ?? ''),
       termId: String(fd.get('term_id') ?? '') || null,
     });
 
-    revalidatePath('/admin/dues/reconcile');
+    revalidatePath('/admin/dues');
     revalidatePath('/portal/dues');
     return { ok: 'Adjustment recorded.' };
   } catch (e) { return { error: (e as Error).message }; }
@@ -95,20 +100,16 @@ export async function waiveBalance(_p: FormState, fd: FormData): Promise<FormSta
 export async function sendReminders(_p: FormState, fd: FormData): Promise<FormState> {
   try {
     const me = await requireAdmin();
-    const ids = fd.getAll('household_id').map(String);
+    const ids = fd.getAll('member_id').map(String);
     if (!ids.length) return { error: 'Nobody selected.' };
 
     const rows = await sql<{ email: string; full_name: string; balance: string }[]>`
       select m.email, m.full_name,
-        (coalesce((select sum(dc.amount_cents) from dues_charges dc
-                   join members mm on mm.id = dc.member_id
-                   where mm.household_id = m.household_id), 0)
-         - coalesce((select sum(amount_cents) from payments
-                     where household_id = m.household_id), 0)
-         - coalesce((select sum(amount_cents) from adjustments
-                     where household_id = m.household_id), 0))::text as balance
+        (coalesce((select sum(amount_cents) from dues_charges where member_id = m.id), 0)
+         - coalesce((select sum(amount_cents) from payments    where member_id = m.id), 0)
+         - coalesce((select sum(amount_cents) from adjustments where member_id = m.id), 0))::text as balance
       from members m
-      where m.household_id = any(${ids}) and m.status = 'active'
+      where m.id = any(${ids}) and m.status = 'active'
     `;
 
     for (const r of rows) {
@@ -124,7 +125,7 @@ export async function sendReminders(_p: FormState, fd: FormData): Promise<FormSt
       });
     }
 
-    revalidatePath('/admin/dues/reconcile');
+    revalidatePath('/admin/dues');
     return { ok: `Reminder sent to ${rows.length} member${rows.length === 1 ? '' : 's'}.` };
   } catch (e) { return { error: (e as Error).message }; }
 }
@@ -142,15 +143,19 @@ export async function recordDonation(_p: FormState, fd: FormData): Promise<FormS
 
     const donorId = await Don.findOrCreateDonor(me, {
       name,
-      email: String(fd.get('donor_email') ?? '').trim() || null,
+      email: null,
       type: String(fd.get('donor_type') ?? 'individual') as DonorType,
     });
+
+    // No fund picker on the form — gifts land in General unless someone
+    // reassigns them from the gift list afterwards.
+    const fundId = String(fd.get('fund_id') ?? '') || await Don.generalFundId();
 
     const isInKind = fd.get('is_in_kind') === 'on';
 
     await Don.recordDonation(me, {
       donorId,
-      fundId: String(fd.get('fund_id')),
+      fundId,
       amountCents: cents,
       receivedOn: String(fd.get('received_on') || today()),
       method: isInKind ? 'in_kind' : String(fd.get('method') ?? 'cash'),
@@ -174,6 +179,16 @@ export async function acknowledgeDonation(_p: FormState, fd: FormData): Promise<
   } catch (e) { return { error: (e as Error).message }; }
 }
 
+export async function reassignDonationFund(_p: FormState, fd: FormData): Promise<FormState> {
+  try {
+    const me = await requireAdmin();
+    await Don.reassignFund(me, String(fd.get('id')), String(fd.get('fund_id')));
+    revalidatePath('/admin/donations');
+    revalidatePath('/admin/funds');
+    return { ok: 'Moved.' };
+  } catch (e) { return { error: (e as Error).message }; }
+}
+
 export async function createFund(_p: FormState, fd: FormData): Promise<FormState> {
   try {
     const me = await requireAdmin();
@@ -193,12 +208,16 @@ export async function recordExpense(_p: FormState, fd: FormData): Promise<FormSt
     const me = await requireAdmin();
     const cents = amount(fd);
     if (typeof cents === 'string') return { error: cents };
+    const category = String(fd.get('category') ?? 'Other');
     const note = String(fd.get('note') ?? '').trim();
     if (!note) return { error: 'Say what this was for.' };
+    if (category === 'Other' && note.length < 5) {
+      return { error: 'When the category is Other, describe what it was for.' };
+    }
 
     await Ledger.recordExpense(me, {
       amountCents: cents,
-      category: String(fd.get('category') ?? 'expense'),
+      category,
       occurredOn: String(fd.get('occurred_on') || today()),
       note,
       fundId: String(fd.get('fund_id') ?? '') || null,

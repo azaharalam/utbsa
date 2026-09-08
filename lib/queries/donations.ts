@@ -40,6 +40,28 @@ export async function createFund(actor: Member, name: string, restricted: boolea
   return row.id;
 }
 
+/** Every gift needs a fund. Unearmarked ones go here. */
+export async function generalFundId(): Promise<string> {
+  const [f] = await sql<{ id: string }[]>`select id from funds where name = 'General'`;
+  if (f) return f.id;
+  const [made] = await sql<{ id: string }[]>`
+    insert into funds (name, is_restricted, description)
+    values ('General', false, 'Unrestricted. Can be spent on anything.')
+    returning id`;
+  return made.id;
+}
+
+/** Move a gift into a different fund, from the gift list. */
+export async function reassignFund(actor: Member, donationId: string, fundId: string) {
+  assertAdmin(actor);
+  await sql.begin(async (tx) => {
+    await tx`update donations set fund_id = ${fundId} where id = ${donationId}`;
+    await tx`update ledger_entries set fund_id = ${fundId}
+             where source_type = 'donation' and source_id = ${donationId}`;
+  });
+  await audit(actor.id, 'donation.reassign', 'donation', donationId, { fund_id: fundId });
+}
+
 export async function donors(actor: Member, q = ''): Promise<Donor[]> {
   assertAdmin(actor);
   const term = `%${q.trim()}%`;

@@ -16,6 +16,10 @@ const labels: Record<string, string> = {
   expense: 'Expenses', fund_disbursement: 'From funds',
 };
 
+// Expense categories are stored as their display name, so anything not in
+// the map above shows as-is.
+const label = (c: string) => labels[c] ?? c;
+
 export default async function Ledger({ searchParams }: { searchParams: { term?: string } }) {
   const me = await requireAdmin();
 
@@ -80,7 +84,7 @@ export default async function Ledger({ searchParams }: { searchParams: { term?: 
                       </td>
                       <td className="p-3">
                         <Pill tone={e.direction === 'in' ? 'green' : 'red'}>
-                          {labels[e.category] ?? e.category}
+                          {label(e.category)}
                         </Pill>
                         {e.fund_name && <span className="ml-2 text-xs text-ink-mid">{e.fund_name}</span>}
                       </td>

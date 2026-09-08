@@ -115,7 +115,6 @@ async function main() {
     ['app/admin/events/page.tsx', 'events admin'],
     ['app/admin/eboard/page.tsx', 'e-board admin'],
     ['app/admin/dues/page.tsx', 'dues'],
-    ['app/admin/dues/reconcile/page.tsx', 'reconcile'],
     ['app/admin/donations/page.tsx', 'donations'],
     ['app/admin/funds/page.tsx', 'funds'],
     ['app/admin/ledger/page.tsx', 'ledger'],
@@ -130,7 +129,7 @@ async function main() {
   head('Wiring');
   const adminNav = read('app/admin/layout.tsx') ?? '';
   for (const [href, label] of [
-    ['/admin/dues', 'Dues'], ['/admin/dues/reconcile', 'Reconcile'],
+    ['/admin/dues', 'Dues'],
     ['/admin/donations', 'Donations'], ['/admin/funds', 'Funds'],
     ['/admin/ledger', 'Ledger'], ['/admin/requests', 'Requests'],
     ['/admin/settings', 'Settings'],
@@ -191,7 +190,8 @@ async function main() {
   if (dbUp) {
     const applied = (await sql<{ name: string }[]>`select name from _migrations order by name`)
       .map((m) => m.name);
-    for (const m of ['001_init.sql', '002_arrival_semester.sql', '003_drop_program.sql', '004_money.sql']) {
+    for (const m of ['001_init.sql', '002_arrival_semester.sql', '003_drop_program.sql',
+                     '004_money.sql', '005_drop_households.sql']) {
       if (applied.includes(m)) ok(`migration ${m}`);
       else bad(`migration ${m} has not run`, 'npm run db:migrate');
     }
@@ -201,7 +201,7 @@ async function main() {
     `).map((t) => t.table_name);
 
     const want = ['members','sessions','login_tokens','terms','officer_roles','posts','events',
-      'contact_messages','audit_log','settings','households','dues_charges','payments',
+      'contact_messages','audit_log','settings','dues_charges','payments',
       'adjustments','funds','donors','donations','ticket_orders','rsvps',
       'status_change_requests','import_batches','ledger_entries'];
     const absent = want.filter((t) => !tables.includes(t));
@@ -253,10 +253,11 @@ async function main() {
     if (!bad1.length) ok('only students are charged dues');
     else bad(`non-students have charges: ${bad1.map((x:any)=>x.full_name+' ('+x.member_type+')').join(', ')}`);
 
-    const orphan = await sql<any[]>`select count(*)::text n from members where household_id is null`;
-    if (Number(orphan[0].n) === 0) ok('every member belongs to a household');
-    else bad(`${orphan[0].n} members have no household — their payments cannot be recorded`,
-             "update members set household_id = gen_random_uuid() ... see docs, or re-run migration 004");
+    const orphanPay = await sql<any[]>`
+      select count(*)::text n from payments p
+      where not exists (select 1 from members m where m.id = p.member_id)`;
+    if (Number(orphanPay[0].n) === 0) ok('every payment points at a real member');
+    else bad(`${orphanPay[0].n} payments have no member`);
 
     const drift = await sql<any[]>`
       select count(*)::text n from payments p
@@ -305,13 +306,12 @@ async function main() {
         sql`select count(*)::text n from status_change_requests where decided_at is null`)) +
       (await q('donations not yet thanked → /admin/donations',
         sql`select count(*)::text n from donations where acknowledged_at is null`)) +
-      (await q('households owing money    → /admin/dues/reconcile',
+      (await q('members owing money       → /admin/dues',
         sql`select count(*)::text n from (
-              select h.id from households h
-              where (coalesce((select sum(dc.amount_cents) from dues_charges dc
-                               join members m on m.id=dc.member_id where m.household_id=h.id),0)
-                   - coalesce((select sum(amount_cents) from payments where household_id=h.id),0)
-                   - coalesce((select sum(amount_cents) from adjustments where household_id=h.id),0)) > 0
+              select m.id from members m
+              where (coalesce((select sum(amount_cents) from dues_charges where member_id=m.id),0)
+                   - coalesce((select sum(amount_cents) from payments    where member_id=m.id),0)
+                   - coalesce((select sum(amount_cents) from adjustments where member_id=m.id),0)) > 0
             ) x`)) +
       (await q('unread contact messages',
         sql`select count(*)::text n from contact_messages where not handled`));

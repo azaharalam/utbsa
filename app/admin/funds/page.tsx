@@ -14,10 +14,16 @@ export default async function Funds() {
   return (
     <>
       <h1 className="mb-1 font-display text-2xl font-bold sm:text-3xl">Funds</h1>
+      <p className="mb-2 max-w-2xl text-sm text-ink-mid">
+        A fund is a pot that money sits in, not a source of money. Its balance is
+        never typed in — it is donations paid into the fund, minus what has been
+        spent out of it.
+      </p>
       <p className="mb-6 max-w-2xl text-sm text-ink-mid">
-        Restricted funds can only be spent on their stated purpose. Keeping them
-        separate from general money is what stops a gift earmarked for Boishakh
-        quietly paying for something else.
+        You need one whenever money arrives with strings attached. If the Office of
+        Student Involvement gives $500 <em>for Boishakh</em>, that money is not
+        available for a cricket tournament, and keeping it in its own fund is what
+        stops it quietly being spent on something else.
       </p>
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr] lg:items-start">

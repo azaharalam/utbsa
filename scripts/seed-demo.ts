@@ -38,7 +38,6 @@ async function wipe() {
   await sql`delete from events where slug like 'demo-%'`;
   await sql`delete from posts where slug like 'demo-%'`;
   await sql`delete from members where email like ${'%' + DOMAIN}`;
-  await sql`delete from households where label like 'demo:%'`;
   await sql`delete from funds where name = 'Boishakh 1434'`;
   await sql`delete from contact_messages where email like ${'%' + DOMAIN}`;
   await sql`delete from terms where name like '%(demo)'`;
@@ -69,27 +68,9 @@ async function seed() {
     values ('Boishakh 1434', true, 'Restricted to the spring cultural programme.')
     returning *`;
 
-  // ── households ───────────────────────────────────────────
-  async function household(label: string) {
-    const [h] = await sql<any[]>`
-      insert into households (label) values (${'demo:' + label}) returning *`;
-    return h.id as string;
-  }
-
-  const hTanvir  = await household('Tanvir Rahman');
-  const hRafid   = await household('Rafid Hossain');
-  const hSadia   = await household('Sadia Akter');
-  const hImran   = await household('Imran & Rumana');   // two people, one student
-  const hArif    = await household('Arif Khan');
-  const hNusrat  = await household('Nusrat Ahmed');
-  const hFarhana = await household('Farhana & Sabbir');  // two students
-  const hMizan   = await household('Dr. Mizanur Zaman'); // faculty, no charges
-  const hNafisa  = await household('Nafisa Firoz');      // alumni
-  const hHabibur = await household('Habibur Karim');     // pending
-
   // ── members ──────────────────────────────────────────────
   type M = {
-    name: string; email: string; hh: string; type?: string; level?: string | null;
+    name: string; email: string; type?: string; level?: string | null;
     dept?: string | null; home?: string | null; status?: string; role?: string;
     phone?: string | null; showPhone?: boolean; sem?: string | null; yr?: number | null;
     bio?: string | null;
@@ -100,13 +81,13 @@ async function seed() {
       insert into members (
         full_name, email, phone, member_type, student_level, department,
         hometown_bd, arrival_semester, arrival_year, bio,
-        status, role, household_id, show_phone,
+        status, role, show_phone,
         email_verified_at, approved_at
       ) values (
         ${m.name}, ${m.email}, ${m.phone ?? null}, ${m.type ?? 'student'},
         ${m.level ?? null}, ${m.dept ?? null}, ${m.home ?? null},
         ${m.sem ?? null}, ${m.yr ?? null}, ${m.bio ?? null},
-        ${m.status ?? 'active'}, ${m.role ?? 'member'}, ${m.hh},
+        ${m.status ?? 'active'}, ${m.role ?? 'member'},
         ${m.showPhone ?? false}, ${ts(-30)},
         ${m.status === 'pending' ? null : ts(-29)}
       ) returning *`;
@@ -114,66 +95,66 @@ async function seed() {
   }
 
   const tanvir = await member({
-    name: 'Tanvir Rahman', email: 'tanvir' + DOMAIN, hh: hTanvir, role: 'admin',
+    name: 'Tanvir Rahman', email: 'tanvir' + DOMAIN, role: 'admin',
     level: 'phd', dept: 'Chemical Engineering', home: 'Chattogram',
     phone: '+1 419 555 0101', showPhone: true, sem: 'fall', yr: 2023,
     bio: 'Third-year PhD. Runs the cricket team badly.',
   });
 
   const rafid = await member({
-    name: 'Rafid Hossain', email: 'rafid' + DOMAIN, hh: hRafid,
+    name: 'Rafid Hossain', email: 'rafid' + DOMAIN,
     level: 'masters', dept: 'Computer Science', home: 'Dhaka',
     phone: '+1 419 555 0142', sem: 'fall', yr: 2026,
   });
 
   const sadia = await member({
-    name: 'Sadia Akter', email: 'sadia' + DOMAIN, hh: hSadia,
+    name: 'Sadia Akter', email: 'sadia' + DOMAIN,
     level: 'masters', dept: 'Public Health', home: 'Rajshahi',
     showPhone: true, phone: '+1 419 555 0117', sem: 'spring', yr: 2025,
   });
 
   const imran = await member({
-    name: 'Imran Mahmud', email: 'imran' + DOMAIN, hh: hImran,
+    name: 'Imran Mahmud', email: 'imran' + DOMAIN,
     level: 'phd', dept: 'Computer Science', home: 'Dhaka', sem: 'fall', yr: 2022,
   });
   await member({
-    name: 'Rumana Begum', email: 'rumana' + DOMAIN, hh: hImran,
+    name: 'Rumana Begum', email: 'rumana' + DOMAIN,
     type: 'spouse', dept: null, home: 'Khulna', sem: 'fall', yr: 2022,
     bio: 'Cooks for forty people without breaking a sweat.',
   });
 
   const arif = await member({
-    name: 'Arif Khan', email: 'arif' + DOMAIN, hh: hArif,
+    name: 'Arif Khan', email: 'arif' + DOMAIN,
     level: 'undergrad', dept: 'Pharmacy', home: 'Sylhet', sem: 'fall', yr: 2025,
   });
 
   const nusrat = await member({
-    name: 'Nusrat Ahmed', email: 'nusrat' + DOMAIN, hh: hNusrat,
+    name: 'Nusrat Ahmed', email: 'nusrat' + DOMAIN,
     level: 'masters', dept: 'Public Health', home: 'Cumilla', sem: 'spring', yr: 2024,
   });
 
   const farhana = await member({
-    name: 'Farhana Kabir', email: 'farhana' + DOMAIN, hh: hFarhana,
+    name: 'Farhana Kabir', email: 'farhana' + DOMAIN,
     level: 'masters', dept: 'Computer Science', home: 'Barishal', sem: 'fall', yr: 2024,
   });
   const sabbir = await member({
-    name: 'Sabbir Islam', email: 'sabbir' + DOMAIN, hh: hFarhana,
+    name: 'Sabbir Islam', email: 'sabbir' + DOMAIN,
     level: 'phd', dept: 'Economics', home: 'Barishal', sem: 'fall', yr: 2024,
   });
 
   const mizan = await member({
-    name: 'Dr. Mizanur Zaman', email: 'mizan' + DOMAIN, hh: hMizan,
+    name: 'Dr. Mizanur Zaman', email: 'mizan' + DOMAIN,
     type: 'faculty', dept: 'Civil Engineering', home: 'Bogura', sem: 'fall', yr: 2019,
   });
 
   const nafisa = await member({
-    name: 'Nafisa Firoz', email: 'nafisa' + DOMAIN, hh: hNafisa,
+    name: 'Nafisa Firoz', email: 'nafisa' + DOMAIN,
     type: 'alumni', dept: 'Biology', home: 'Khulna', status: 'alumni',
     sem: 'fall', yr: 2021,
   });
 
-  await member({
-    name: 'Habibur Karim', email: 'habibur' + DOMAIN, hh: hHabibur,
+  const habibur = await member({
+    name: 'Habibur Karim', email: 'habibur' + DOMAIN,
     status: 'pending', level: 'masters', dept: 'Mechanical Engineering',
     phone: '+1 567 555 0119',
   });
@@ -192,12 +173,12 @@ async function seed() {
   }
 
   // ── payments, with a ledger row for each ─────────────────
-  async function pay(hh: string, cents: number, method: string, when: string,
+  async function pay(memberId: string, cents: number, method: string, when: string,
                      termId: string, note: string, fundId?: string) {
     const [p] = await sql<any[]>`
-      insert into payments (household_id, amount_cents, method, fund_id, paid_on,
+      insert into payments (member_id, amount_cents, method, fund_id, paid_on,
                             term_id, recorded_by, note)
-      values (${hh}, ${cents}, ${method}, ${fundId ?? null}, ${when},
+      values (${memberId}, ${cents}, ${method}, ${fundId ?? null}, ${when},
               ${termId}, ${tanvir.id}, ${note})
       returning *`;
 
@@ -217,30 +198,31 @@ async function seed() {
   }
 
   // Settled — paid both semesters
-  await pay(hTanvir, 1500, 'cash',  day(-190), spring.id, 'Spring dues');
-  await pay(hTanvir, 1500, 'zelle', day(-15),  fall.id,   'Fall dues');
+  await pay(tanvir.id, 1500, 'cash',  day(-190), spring.id, 'Spring dues');
+  await pay(tanvir.id, 1500, 'zelle', day(-15),  fall.id,   'Fall dues');
 
-  await pay(hSadia,  1500, 'cash',  day(-185), spring.id, 'Spring dues');
-  await pay(hSadia,  1500, 'cash',  day(-12),  fall.id,   'Fall dues');
+  await pay(sadia.id,  1500, 'cash',  day(-185), spring.id, 'Spring dues');
+  await pay(sadia.id,  1500, 'cash',  day(-12),  fall.id,   'Fall dues');
 
-  // Two students in one house — $30 a semester, paid in one go
-  await pay(hFarhana, 3000, 'zelle', day(-180), spring.id, 'Spring dues, both of us');
-  await pay(hFarhana, 3000, 'zelle', day(-10),  fall.id,   'Fall dues, both of us');
+  // A couple, both students. Each is charged and pays separately now.
+  await pay(farhana.id, 1500, 'zelle', day(-180), spring.id, 'Spring dues');
+  await pay(farhana.id, 1500, 'zelle', day(-10),  fall.id,   'Fall dues');
+  await pay(sabbir.id,  1500, 'zelle', day(-180), spring.id, 'Spring dues');
+  await pay(sabbir.id,  1500, 'zelle', day(-10),  fall.id,   'Fall dues');
 
   // Partial — paid $8 of $15
-  await pay(hArif, 1500, 'cash', day(-188), spring.id, 'Spring dues');
-  await pay(hArif,  800, 'cash', day(-5),   fall.id,   'Part of Fall dues');
+  await pay(arif.id, 1500, 'cash', day(-188), spring.id, 'Spring dues');
+  await pay(arif.id,  800, 'cash', day(-5),   fall.id,   'Part of Fall dues');
 
   // Overpaid — $20 against a $15 charge, so sits in credit
-  await pay(hImran, 1500, 'cash',  day(-186), spring.id, 'Spring dues');
-  await pay(hImran, 2000, 'check', day(-8),   fall.id,   'Rounded up, keep the change');
+  await pay(imran.id, 1500, 'cash',  day(-186), spring.id, 'Spring dues');
+  await pay(imran.id, 2000, 'check', day(-8),   fall.id,   'Rounded up, keep the change');
 
   // Covered from the Dues Assistance fund
-  await pay(hNusrat, 1500, 'cash', day(-184), spring.id, 'Spring dues');
-  await pay(hNusrat, 1500, 'fund', day(-3),   fall.id,   'Fall dues covered from fund', assist.id);
+  await pay(nusrat.id, 1500, 'cash', day(-184), spring.id, 'Spring dues');
+  await pay(nusrat.id, 1500, 'fund', day(-3),   fall.id,   'Fall dues covered from fund', assist.id);
 
   // Rafid: new this autumn, nothing paid yet — owes $15
-  // Sabbir is in Farhana's household, already covered above
 
   // ── an adjustment: two semesters waived ──────────────────
   // (nobody currently owes two full semesters, so give one to Rafid's
@@ -429,7 +411,8 @@ Demo data loaded.
     arif${DOMAIN}      paid $8 of $15, owes $7
     imran${DOMAIN}     overpaid, $5 in credit
     nusrat${DOMAIN}    dues covered from the assistance fund
-    farhana${DOMAIN}   two students in one household, all paid
+    farhana${DOMAIN}   settled up
+    sabbir${DOMAIN}    settled up
     rumana${DOMAIN}    spouse — never charged
     mizan${DOMAIN}     faculty — never charged
     nafisa${DOMAIN}    alumni
@@ -438,7 +421,7 @@ Demo data loaded.
     · 1 member pending approval        /admin/approvals
     · 1 graduation request             /admin/requests
     · 1 unacknowledged donation        /admin/donations
-    · 3 households owing money         /admin/dues/reconcile
+    · members owing money             /admin/dues
     · 1 draft post                     /admin/posts
 
   Remove it all with:  npm run db:demo -- wipe

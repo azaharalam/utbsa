@@ -9,7 +9,7 @@ import { Submit, Money } from '@/components/money/forms';
 export default function AssessPanel({
   terms, current,
 }: {
-  terms: { id: string; name: string; dues_cents: number; assessed: boolean }[];
+  terms: { id: string; name: string; dues_cents: number }[];
   current: {
     term_id: string; term_name: string; student_count: number;
     dues_cents: number; total_cents: number; already_assessed: string | null;
@@ -23,7 +23,7 @@ export default function AssessPanel({
     <Card>
       <h2 className="mb-1 font-display text-lg font-bold">Assess dues</h2>
       <p className="mb-4 text-sm text-ink-mid">
-        Charges every active student for the term. Non-students are not charged.
+        Charges every active student for the term. Non-students are never charged.
       </p>
 
       {assessState.error && <Notice tone="error">{assessState.error}</Notice>}
@@ -76,8 +76,8 @@ export default function AssessPanel({
 
       <h3 className="mb-2 font-display text-base font-bold">Change the rate</h3>
       <p className="mb-3 text-sm text-ink-mid">
-        Set per term. Charges already written keep the amount they were assessed at,
-        so past semesters are never rewritten.
+        Set per term. Charges already written keep the amount they were assessed at, so
+        past semesters are never rewritten.
       </p>
       <form action={setRate}>
         <Field label="Term" name="term_id" as="select"

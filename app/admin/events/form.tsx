@@ -50,8 +50,6 @@ export default function EventForm() {
           </div>
         </div>
 
-        <Field label="Title in Bengali" name="bengali_title" placeholder="বিজয় দিবস" />
-
         <div className="grid gap-x-4 sm:grid-cols-2">
           <Field label="Starts" name="starts_at" type="datetime-local" required />
           <Field label="Ends" name="ends_at" type="datetime-local" />

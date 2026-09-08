@@ -1,48 +1,71 @@
 'use client';
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useRef, useState, useEffect } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { recordPayment } from '@/app/actions/money';
 import { Card, Notice, Field } from '@/components/ui';
 import { Submit } from '@/components/money/forms';
+import { SEASONS, yearOptions } from '@/lib/money';
+
+function Clear({ ok, formRef }: { ok?: string; formRef: React.RefObject<HTMLFormElement> }) {
+  const { pending } = useFormStatus();
+  useEffect(() => { if (ok && !pending) formRef.current?.reset(); }, [ok, pending, formRef]);
+  return null;
+}
 
 export default function PaymentForm({
-  households, terms, funds,
+  members, funds,
 }: {
-  households: { id: string; label: string; balance: number }[];
-  terms: { id: string; name: string }[];
+  members: { id: string; name: string; balance: number }[];
   funds: { id: string; name: string; balance: number }[];
 }) {
   const [state, action] = useFormState(recordPayment, {});
   const [method, setMethod] = useState('cash');
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const years = yearOptions();
+  const thisYear = new Date().getFullYear();
+  const month = new Date().getMonth();
+  const guessSeason = month < 4 ? 'spring' : month < 7 ? 'summer' : 'fall';
 
   return (
     <Card>
       <h2 className="mb-1 font-display text-lg font-bold">Record a payment</h2>
       <p className="mb-4 text-sm text-ink-mid">
-        Cash at a picnic, a bank transfer, or dues covered from a fund. Partial
-        amounts are fine — the balance just goes down by what was paid.
+        Cash at a picnic, a bank transfer, or dues covered from a fund. Partial amounts
+        are fine — the balance just goes down by what was paid.
       </p>
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
       {state.ok && <Notice tone="success">{state.ok}</Notice>}
 
-      <form action={action}>
-        <Field label="Household" name="household_id" as="select"
-          options={households.map((h) => ({
-            value: h.id,
-            label: h.balance > 0 ? `${h.label} — owes $${(h.balance / 100).toFixed(2)}` : h.label,
+      <form action={action} ref={formRef}>
+        <Clear ok={state.ok} formRef={formRef} />
+
+        <Field label="Member" name="member_id" as="select"
+          options={members.map((m) => ({
+            value: m.id,
+            label: m.balance > 0 ? `${m.name} — owes $${(m.balance / 100).toFixed(2)}` : m.name,
           }))} />
 
         <div className="grid gap-x-4 sm:grid-cols-2">
           <Field label="Amount" name="amount" placeholder="15.00" required />
-          <Field label="Date" name="paid_on" type="date"
+          <Field label="Date received" name="paid_on" type="date"
             defaultValue={new Date().toISOString().slice(0, 10)} />
+        </div>
+
+        {/* Semester and year, not a term picker. The term is created if it
+            does not exist, so nothing has to be set up first. */}
+        <div className="grid gap-x-4 sm:grid-cols-2">
+          <Field label="For which semester" name="season" as="select" defaultValue={guessSeason}
+            options={SEASONS.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }))} />
+          <Field label="Year" name="year" as="select" defaultValue={String(thisYear)}
+            options={years.map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
 
         <div className="mb-4">
           <label htmlFor="method" className="mb-1.5 block text-xs font-semibold text-ink-mid">
-            Method
+            How it was paid
           </label>
           <select id="method" name="method" value={method}
             onChange={(e) => setMethod(e.target.value)}
@@ -64,10 +87,7 @@ export default function PaymentForm({
             }))} />
         )}
 
-        <Field label="Term" name="term_id" as="select"
-          options={terms.map((t) => ({ value: t.id, label: t.name }))} />
         <Field label="Note" name="note" placeholder="Optional" />
-
         <Submit label="Record payment" full />
       </form>
     </Card>

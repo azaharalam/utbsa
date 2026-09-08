@@ -37,15 +37,38 @@ export type Settings = {
   org_email: string | null;
 };
 
-export type HouseholdBalance = {
-  household_id: string;
-  label: string | null;
-  member_names: string;
+export type MemberBalance = {
+  member_id: string;
+  full_name: string;
+  email: string;
+  member_type: string;
+  student_level: string | null;
+  department: string | null;
+  photo_url: string | null;
   charged_cents: number;
   paid_cents: number;
   adjusted_cents: number;
   balance_cents: number;
 };
+
+/** Fixed list offered in the UI. `category` in the database stays free
+ *  text so this can grow without a migration. */
+export const EXPENSE_CATEGORIES = [
+  'Food and catering',
+  'Venue and equipment rental',
+  'Decorations and supplies',
+  'Sports and recreation',
+  'Printing and promotion',
+  'Other',
+] as const;
+
+export const SEASONS = ['spring', 'summer', 'fall'] as const;
+
+/** Current year ±5 — eleven options, newest first. */
+export function yearOptions(): number[] {
+  const y = new Date().getFullYear();
+  return Array.from({ length: 11 }, (_, i) => y + 5 - i);
+}
 
 export type DuesLine = {
   kind: 'charge' | 'payment' | 'adjustment';
