@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { savePost } from '@/app/actions/admin';
 import { Card, Field, Notice } from '@/components/ui';
+import { Confirmation } from '@/components/money/form-result';
 import type { Post } from '@/lib/types';
 
 function slugify(s: string) {
@@ -39,7 +40,7 @@ export default function PostEditor({ post }: { post?: Post | null }) {
       <h1 className="mb-5 font-display text-2xl font-bold sm:text-3xl">{post ? 'Edit post' : 'New post'}</h1>
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      <Confirmation message={state.ok} />
 
       <form action={action}>
         <input type="hidden" name="id" value={post?.id ?? ''} />

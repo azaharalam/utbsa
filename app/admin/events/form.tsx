@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { saveEvent } from '@/app/actions/admin';
 import { Card, Field, Button, Notice, Toggle } from '@/components/ui';
+import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
 
 function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60);
@@ -17,14 +18,16 @@ function Submit() {
 export default function EventForm() {
   const [state, action] = useFormState(saveEvent, {});
   const [slug, setSlug] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
 
   return (
     <Card>
       <h2 className="mb-4 font-display text-lg font-bold">Add an event</h2>
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      <Confirmation message={state.ok} />
 
-      <form action={action}>
+      <form action={action} ref={formRef}>
+        <ResetOnSuccess ok={state.ok} formRef={formRef} also={() => setSlug('')} />
         <div className="mb-4">
           <label htmlFor="ev-title" className="mb-1.5 block text-xs font-semibold text-ink-mid">
             Title <span className="text-alta">*</span>
@@ -61,7 +64,12 @@ export default function EventForm() {
 
         <div className="mb-4">
           <Toggle label="Visible to the public" name="is_public" defaultChecked={true} />
+          <Toggle label="This is a potluck — members bring dishes"
+            name="is_potluck" defaultChecked={false} />
         </div>
+        <p className="mb-4 text-xs text-ink-mid">
+          Tick the potluck box and you can build the dish list once the event is saved.
+        </p>
 
         <Submit />
       </form>

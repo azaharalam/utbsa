@@ -37,7 +37,16 @@ async function wipe() {
   await sql`delete from ticket_orders where purchaser_email like ${'%' + DOMAIN}`;
   await sql`delete from events where slug like 'demo-%'`;
   await sql`delete from posts where slug like 'demo-%'`;
-  await sql`delete from members where email like ${'%' + DOMAIN}`;
+  await sql`delete from potluck_items where event_id in (select id from events where slug like 'demo-%')`;
+  await sql`delete from household_invites where from_member in (select id from members where personal_email like ${'%' + DOMAIN})
+            or to_member in (select id from members where personal_email like ${'%' + DOMAIN})`;
+  await sql`delete from households where label like 'demo:%'`;
+  await sql`delete from arrival_requests where email like ${'%' + DOMAIN}`;
+  await sql`delete from giveaway_items where posted_by in (select id from members where personal_email like ${'%' + DOMAIN})`;
+  await sql`delete from housing_posts where posted_by in (select id from members where personal_email like ${'%' + DOMAIN})`;
+  await sql`delete from job_posts where posted_by in (select id from members where personal_email like ${'%' + DOMAIN})`;
+  await sql`delete from payment_claims where member_id in (select id from members where personal_email like ${'%' + DOMAIN})`;
+  await sql`delete from members where personal_email like ${'%' + DOMAIN}`;
   await sql`delete from funds where name = 'Boishakh 1434'`;
   await sql`delete from contact_messages where email like ${'%' + DOMAIN}`;
   await sql`delete from terms where name like '%(demo)'`;
@@ -77,14 +86,24 @@ async function seed() {
   };
 
   async function member(m: M) {
+    const type = m.type ?? 'student';
+    // Students and alumni get a UToledo address as well as a personal one.
+    const university = ['student', 'alumni'].includes(type)
+      ? m.email.replace(DOMAIN, '@rockets.utoledo.edu')
+      : null;
+    // We write to the UToledo address while it works, the personal one after.
+    const contact = type === 'student' ? (university ?? m.email) : m.email;
+
     const [row] = await sql<any[]>`
       insert into members (
-        full_name, email, phone, member_type, student_level, department,
+        full_name, email, university_email, personal_email,
+        phone, member_type, student_level, department,
         hometown_bd, arrival_semester, arrival_year, bio,
         status, role, show_phone,
         email_verified_at, approved_at
       ) values (
-        ${m.name}, ${m.email}, ${m.phone ?? null}, ${m.type ?? 'student'},
+        ${m.name}, ${contact}, ${university}, ${m.email},
+        ${m.phone ?? null}, ${m.type ?? 'student'},
         ${m.level ?? null}, ${m.dept ?? null}, ${m.home ?? null},
         ${m.sem ?? null}, ${m.yr ?? null}, ${m.bio ?? null},
         ${m.status ?? 'active'}, ${m.role ?? 'member'},
@@ -117,7 +136,7 @@ async function seed() {
     name: 'Imran Mahmud', email: 'imran' + DOMAIN,
     level: 'phd', dept: 'Computer Science', home: 'Dhaka', sem: 'fall', yr: 2022,
   });
-  await member({
+  const rumana = await member({
     name: 'Rumana Begum', email: 'rumana' + DOMAIN,
     type: 'spouse', dept: null, home: 'Khulna', sem: 'fall', yr: 2022,
     bio: 'Cooks for forty people without breaking a sweat.',
@@ -273,6 +292,17 @@ async function seed() {
   await gift(dBiz.id,  boishakh.id, 15000, day(-4), 'in_kind', false,
              'Catering donated for Boishakh', true, 'Biryani and dessert for 60 people');
 
+  // Two sponsors who agreed to be named; the rest stay private.
+  await sql`
+    update donors set show_publicly = true,
+      blurb = 'Catered Boishakh three years running.',
+      website = 'https://example.com'
+    where id = ${dBiz.id}`;
+  await sql`
+    update donors set show_publicly = true,
+      blurb = 'Cultural programming grant.'
+    where id = ${dUni.id}`;
+
   // ── expenses ─────────────────────────────────────────────
   await sql`
     insert into ledger_entries (occurred_on, direction, category, amount_cents,
@@ -332,16 +362,42 @@ async function seed() {
     startsIn: -25, hours: 2, venue: 'Student Union 2582',
   });
 
+  // ── a linked household: Imran and Rumana ─────────────────
+  const [hh] = await sql<any[]>`
+    insert into households (label) values ('demo:Imran and Rumana') returning id`;
+  await sql`update members set household_id = ${hh.id}
+            where id in (${imran.id}, ${rumana.id})`;
+
   // ── RSVPs ────────────────────────────────────────────────
+  // One answer per household — Imran answers for himself and Rumana.
   await sql`
-    insert into rsvps (event_id, member_id, guest_count, note) values
-      (${picnic.id}, ${tanvir.id}, 0,  null),
-      (${picnic.id}, ${sadia.id},  1,  'Bringing my sister, visiting from Chicago'),
-      (${picnic.id}, ${imran.id},  3,  'Two kids — one needs the food mild'),
-      (${picnic.id}, ${farhana.id},1,  null),
-      (${picnic.id}, ${arif.id},   0,  'Might be an hour late'),
-      (${cricket.id},${tanvir.id}, 0,  null),
-      (${cricket.id},${sabbir.id}, 2,  null)`;
+    insert into rsvps (event_id, member_id, household_id, adults, children, note) values
+      (${picnic.id}, ${tanvir.id},  null,     1, 0, null),
+      (${picnic.id}, ${sadia.id},   null,     2, 0, 'Bringing my sister, visiting from Chicago'),
+      (${picnic.id}, ${imran.id},   ${hh.id}, 2, 2, 'Two kids — one needs the food mild'),
+      (${picnic.id}, ${farhana.id}, null,     2, 0, null),
+      (${picnic.id}, ${arif.id},    null,     1, 0, 'Might be an hour late'),
+      (${cricket.id},${tanvir.id},  null,     1, 0, null),
+      (${cricket.id},${sabbir.id},  null,     3, 0, null)`;
+
+  // ── the picnic is a potluck ───────────────────────────────
+  await sql`update events set is_potluck = true where id = ${picnic.id}`;
+
+  await sql`
+    insert into potluck_items (event_id, category, dish, covers, sort_order, claimed_by, claimed_at) values
+      (${picnic.id}, 'rice',     'Polao',              20, 0, ${tanvir.id}, now()),
+      (${picnic.id}, 'rice',     'Plain rice',         20, 0, null, null),
+      (${picnic.id}, 'meat',     'Beef curry',         15, 1, ${imran.id}, now()),
+      (${picnic.id}, 'meat',     'Beef curry',         15, 1, ${farhana.id}, now()),
+      (${picnic.id}, 'meat',     'Beef curry',         15, 1, null, null),
+      (${picnic.id}, 'meat',     'Chicken roast',      15, 1, null, null),
+      (${picnic.id}, 'veg',      'Begun bharta',       20, 3, ${rumana.id}, now()),
+      (${picnic.id}, 'dal',      'Musur dal',          25, 4, null, null),
+      (${picnic.id}, 'starter',  'Shingara',           30, 5, ${sadia.id}, now()),
+      (${picnic.id}, 'dessert',  'Payesh',             25, 7, null, null),
+      (${picnic.id}, 'dessert',  'Mishti',             25, 7, null, null),
+      (${picnic.id}, 'drinks',   'Borhani',            30, 8, ${arif.id}, now()),
+      (${picnic.id}, 'supplies', 'Plates, cups, cutlery for 60', 60, 9, null, null)`;
 
   // ── ticket sales for the cricket cup ─────────────────────
   async function ticket(name: string, email: string | null, adults: number,
@@ -365,6 +421,19 @@ async function seed() {
   await ticket('Ahmed Sultan',   'ahmed' + DOMAIN,   1,  500, 'cash');
   await ticket('Priya Raman',    'priya' + DOMAIN,   3, 1500, 'zelle');
 
+  // ── transfers waiting to be checked ──────────────────────
+  await sql`
+    insert into payment_claims (member_id, transaction_ref, amount_cents, sent_on,
+                                method_label, note, submitted_via, status) values
+      (${rafid.id},  'ZL8842PQ71', 1500, ${day(-2)}, 'Zelle',
+       'Sent from my Huntington account', 'link', 'pending'),
+      (${arif.id},   'ZL7719KD03',  700, ${day(-1)}, 'Zelle',
+       'The rest of what I owe', 'portal', 'pending')`;
+
+  await sql`
+    insert into claim_tokens (token_hash, member_id)
+    values (encode(sha256('demo-token-rafid'::bytea), 'hex'), ${rafid.id})`;
+
   // ── a pending graduation request ─────────────────────────
   await sql`
     insert into status_change_requests (member_id, from_type, to_type, reason, requested_at)
@@ -372,14 +441,24 @@ async function seed() {
             'Defending in December, staying in Toledo', ${ts(-2)})`;
 
   // ── e-board ──────────────────────────────────────────────
+  // The board serves the session currently running, not a semester.
+  const [{ current_session: session }] = await sql<any[]>`
+    select current_session from settings where id = 1`;
+
+  await sql`delete from officer_roles where title in
+    ('President','Vice President','Treasurer','General Secretary',
+     'Event Coordinator','Media Officer','Faculty Advisor')
+    and member_id in (select id from members where personal_email like ${'%' + DOMAIN})`;
+
   await sql`
-    insert into officer_roles (member_id, term_id, title, is_eboard, sort_order) values
-      (${tanvir.id},  ${fall.id}, 'President', true, 1),
-      (${nusrat.id},  ${fall.id}, 'Vice President', true, 2),
-      (${sabbir.id},  ${fall.id}, 'Treasurer', true, 3),
-      (${farhana.id}, ${fall.id}, 'General Secretary', true, 4),
-      (${imran.id},   ${fall.id}, 'Event Coordinator', true, 5),
-      (${mizan.id},   ${fall.id}, 'Faculty Advisor', true, 6)`;
+    insert into officer_roles (member_id, session, title, permission_set, is_eboard, sort_order) values
+      (${tanvir.id},  ${session}, 'President',         'full',    true, 0),
+      (${nusrat.id},  ${session}, 'Vice President',    'members', true, 1),
+      (${farhana.id}, ${session}, 'General Secretary', 'full',    true, 2),
+      (${sabbir.id},  ${session}, 'Treasurer',         'money',   true, 3),
+      (${imran.id},   ${session}, 'Event Coordinator', 'events',  true, 4),
+      (${sadia.id},   ${session}, 'Media Officer',     'content', true, 7),
+      (${mizan.id},   ${session}, 'Faculty Advisor',   'none',    true, 8)`;
 
   // ── a draft post, so the editor has something to open ────
   await sql`
@@ -389,6 +468,51 @@ async function seed() {
             ${'Draft — not published yet.\n\n## The coat\n\nWhatever you brought from home is not enough. You want something rated to −20°C, and you want it before Thanksgiving, not after.'},
             'Guide', ${nusrat.id}, 'draft')`;
 
+  // ── people arriving ──────────────────────────────────────
+  await sql`
+    insert into arrival_requests (full_name, email, phone, arriving_on, arriving_at,
+      airport, flight_no, people_count, luggage_note, needs_pickup, needs_stay,
+      needs_shopping, program, department, note, status, claimed_by) values
+      ('Shahriar Kabir', ${'shahriar' + DOMAIN}, '+880 1712 555001',
+       ${day(6)}, '18:40', 'DTW', 'QR 725', 2, 'Two large suitcases',
+       true, true, false, 'MS', 'Mechanical Engineering',
+       'Travelling with my wife. First time in the US.', 'open', null),
+      ('Tasnim Jahan', ${'tasnim' + DOMAIN}, '+880 1911 555002',
+       ${day(13)}, '22:15', 'DTW', 'EK 211', 1, 'One suitcase and a carry-on',
+       true, false, true, 'PhD', 'Chemistry', null, 'claimed', ${tanvir.id}),
+      ('Nayeem Rahman', ${'nayeem' + DOMAIN}, null,
+       ${day(-10)}, '14:00', 'TOL', null, 1, null,
+       true, false, false, 'BS', 'Business', null, 'done', ${imran.id})`;
+
+  // ── things people are leaving behind ─────────────────────
+  await sql`
+    insert into giveaway_items (posted_by, title, description, category, condition, price_cents, status) values
+      (${nafisa.id}, 'IKEA desk and chair', 'Collect from Old Orchard. Good condition, one small scratch.', 'furniture', 'good', 0, 'available'),
+      (${nafisa.id}, 'Winter coat, size M', 'Rated to -20C. Got me through three winters.', 'winter', 'worn', 0, 'available'),
+      (${sabbir.id}, 'Rice cooker and pressure cooker', 'Both work fine. Selling as a pair.', 'kitchen', 'good', 1500, 'available'),
+      (${farhana.id}, 'Full bedding set', 'Washed and ready. Free to a new arrival.', 'bedding', 'good', 0, 'claimed'),
+      (${imran.id}, 'Monitor, 24 inch', null, 'electronics', 'good', 3000, 'available')`;
+
+  // ── rooms ────────────────────────────────────────────────
+  await sql`
+    insert into housing_posts (posted_by, kind, title, area, rent_cents, available_from, description) values
+      (${arif.id}, 'offering', 'Room in a 2-bed near campus', 'Old Orchard', 45000, ${day(20)},
+       'Ten minutes on the 20 bus. Utilities included. Quiet flatmate, no smoking.'),
+      (${rafid.id}, 'seeking', 'Looking for a room from January', 'Anywhere on a bus route', 50000, ${day(100)},
+       'MS student, quiet, no pets. Happy to share with one or two others.'),
+      (${nusrat.id}, 'sublet', 'Sublet for the summer', 'Dorr Street', 40000, ${day(240)},
+       'Away May to August. Furnished, everything included.')`;
+
+  // ── jobs ─────────────────────────────────────────────────
+  await sql`
+    insert into job_posts (posted_by, title, organisation, location, kind, link, description, closes_on) values
+      (${nafisa.id}, 'Software Engineer, new grad', 'Owens Corning', 'Toledo, OH', 'referral',
+       null, 'I work here and can refer. Send me your CV before you apply — a referral goes to a different queue.', ${day(30)}),
+      (${mizan.id}, 'Graduate research assistantship', 'UToledo Civil Engineering', 'Toledo, OH', 'assistantship',
+       null, 'Funded position starting in the spring. Structural or geotechnical background.', ${day(45)}),
+      (${tanvir.id}, 'Summer internship, process engineering', 'First Solar', 'Perrysburg, OH', 'internship',
+       'https://example.com/apply', null, ${day(60)})`;
+
   // ── an unread contact message ────────────────────────────
   await sql`
     insert into contact_messages (name, email, subject, message)
@@ -397,7 +521,7 @@ async function seed() {
 
   // ── summary ──────────────────────────────────────────────
   const [{ n: mcount }] = await sql<any[]>`
-    select count(*)::text as n from members where email like ${'%' + DOMAIN}`;
+    select count(*)::text as n from members where personal_email like ${'%' + DOMAIN}`;
 
   console.log(`
 Demo data loaded.
@@ -422,7 +546,20 @@ Demo data loaded.
     · 1 graduation request             /admin/requests
     · 1 unacknowledged donation        /admin/donations
     · members owing money             /admin/dues
+    · 2 transfers to check             /admin/claims
+    · 1 arrival with nobody assigned   /admin/arrivals
     · 1 draft post                     /admin/posts
+
+  Member boards:
+    /portal/arrivals   3 people landing — take one and details appear
+    /portal/giveaway   5 items, mostly free
+    /portal/housing    a room, a search, a sublet
+    /portal/jobs       a referral offer, an assistantship, an internship
+
+  Potluck and households:
+    The Fall Picnic is a potluck — 13 dishes, 6 already claimed
+    Imran and Rumana are linked as one household. Sign in as either and
+    the other's RSVP shows as already answered for both.
 
   Remove it all with:  npm run db:demo -- wipe
 `);

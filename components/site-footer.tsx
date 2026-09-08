@@ -13,7 +13,9 @@ export default function SiteFooter() {
           <Link href="/about" className="hover:text-white">About</Link>
           <Link href="/eboard" className="hover:text-white">E-board</Link>
           <Link href="/events" className="hover:text-white">Events</Link>
+          <Link href="/arrive" className="hover:text-white">Arriving</Link>
           <Link href="/blog" className="hover:text-white">Blog</Link>
+          <Link href="/sponsors" className="hover:text-white">Sponsors</Link>
           <Link href="/join" className="hover:text-white">Join</Link>
           <Link href="/auth/login" className="hover:text-white">Sign in</Link>
         </nav>

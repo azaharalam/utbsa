@@ -1,5 +1,6 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { allEvents } from '@/lib/queries/content';
+import Link from 'next/link';
 import { Card, Pill } from '@/components/ui';
 import EventForm from './form';
 
@@ -7,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Events' };
 
 export default async function EventsAdmin() {
-  const me = await requireAdmin();
+  const me = await requirePermission('events');
   const events = await allEvents(me);
 
   return (
@@ -25,7 +26,10 @@ export default async function EventsAdmin() {
               <Card key={e.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-[15px] font-bold">{e.title}</p>
+                    <Link href={`/admin/events/${e.id}`}
+                      className="font-display text-[15px] font-bold hover:text-kantha">
+                      {e.title}
+                    </Link>
                     <p className="text-xs text-ink-mid">
                       {new Date(e.starts_at).toLocaleString('en-US', {
                         day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -34,7 +38,10 @@ export default async function EventsAdmin() {
                     </p>
                   </div>
                   <Pill tone={past ? 'grey' : 'green'}>{past ? 'past' : 'upcoming'}</Pill>
+                  {e.is_potluck && <Pill tone="green">potluck</Pill>}
                   {!e.is_public && <Pill tone="gold">members only</Pill>}
+                  <Link href={`/admin/events/${e.id}`}
+                    className="text-sm font-semibold text-kantha">Open</Link>
                 </div>
               </Card>
             );

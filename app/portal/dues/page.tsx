@@ -1,8 +1,10 @@
 import { requireApproved } from '@/lib/session';
 import { memberLedger, memberBalance } from '@/lib/queries/dues';
 import { getSettings } from '@/lib/queries/settings';
-import { Card, Notice, Empty } from '@/components/ui';
+import { Card, Empty } from '@/components/ui';
 import { Money } from '@/components/money/forms';
+import ClaimForm from '@/components/money/claim-form';
+import { myClaims } from '@/lib/queries/claims';
 import type { DuesLine } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +14,10 @@ export default async function MyDues() {
   const me = await requireApproved();
   const settings = await getSettings();
 
-  const [lines, balance] = await Promise.all([
+  const [lines, balance, claims] = await Promise.all([
     memberLedger(me.id),
     memberBalance(me.id),
+    myClaims(me.id),
   ]);
 
   const isStudent = me.member_type === 'student';
@@ -46,15 +49,24 @@ export default async function MyDues() {
           <p className="mt-2 text-sm text-ink-mid">All settled. Thank you.</p>
         )}
 
-        {balance > 0 && !settings.payments_enabled && (
-          <div className="mt-4">
-            <Notice tone="info">
-              Online payment is not switched on. Hand cash to the treasurer at any event,
-              or ask the e-board how to transfer.
-            </Notice>
-          </div>
-        )}
       </Card>
+
+      {isStudent && (
+        <div className="mb-6">
+          <ClaimForm
+            firstName={me.full_name.split(' ')[0]}
+            balanceCents={balance}
+            settings={{
+              method: settings.pay_method_label,
+              name: settings.pay_to_name,
+              handle: settings.pay_to_handle,
+              instructions: settings.pay_instructions,
+            }}
+            recent={claims.slice(0, 5)}
+            via="portal"
+          />
+        </div>
+      )}
 
       <h2 className="mb-3 font-display text-lg font-bold">History</h2>
       {lines.length ? (

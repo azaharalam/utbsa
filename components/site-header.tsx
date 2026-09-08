@@ -9,7 +9,9 @@ const links = [
   { href: '/about', label: 'About' },
   { href: '/eboard', label: 'E-board' },
   { href: '/events', label: 'Events' },
+  { href: '/arrive', label: 'Arriving' },
   { href: '/blog', label: 'Blog' },
+  { href: '/sponsors', label: 'Sponsors' },
   { href: '/contact', label: 'Contact' },
 ];
 

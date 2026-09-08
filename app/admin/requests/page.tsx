@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { pendingStatusRequests } from '@/lib/queries/tickets';
 import { Empty } from '@/components/ui';
 import RequestRow from './row';
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Requests' };
 
 export default async function Requests() {
-  const me = await requireAdmin();
+  const me = await requirePermission('members');
   const rows = await pendingStatusRequests(me);
 
   return (

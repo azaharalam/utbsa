@@ -3,6 +3,7 @@
 import { useFormState, useFormStatus } from 'react-dom';
 import { sendMessage } from '@/app/actions/contact';
 import { Card, Field, Button, Notice } from '@/components/ui';
+import { Done } from '@/components/money/form-result';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -11,6 +12,17 @@ function Submit() {
 
 export default function ContactForm() {
   const [state, action] = useFormState(sendMessage, {});
+
+  // Nothing follows a sent message, so the form has no reason to stay.
+  if (state.ok) {
+    return (
+      <Done title="Message sent">
+        <p className="text-sm text-ink-mid">
+          Somebody on the e-board will read it and reply by email. Usually within a day or two.
+        </p>
+      </Done>
+    );
+  }
 
   return (
     <Card>

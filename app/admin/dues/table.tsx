@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { sendReminders, waiveBalance, recordPayment } from '@/app/actions/money';
 import { Card, Notice, Pill, Avatar } from '@/components/ui';
+import { useCloseOnSuccess } from '@/components/money/form-result';
 import { Submit, Money } from '@/components/money/forms';
 import { SEASONS, yearOptions } from '@/lib/money';
 import type { MemberBalance } from '@/lib/money';
@@ -23,6 +24,11 @@ export default function DuesTable({
   const [remindState, remind] = useFormState(sendReminders, {});
   const [waiveState, waive] = useFormState(waiveBalance, {});
   const [fundState, payFromFund] = useFormState(recordPayment, {});
+
+  // The inline waive / cover panel should shut once the adjustment lands —
+  // leaving it open shows a form for money already moved.
+  useCloseOnSuccess(fundState.ok, () => setOpenRow(null));
+  useCloseOnSuccess(waiveState.ok, () => setOpenRow(null));
 
   const owing = rows.filter((r) => r.balance_cents > 0);
   const toggle = (id: string) =>

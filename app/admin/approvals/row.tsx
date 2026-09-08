@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { approveMember, rejectMember } from '@/app/actions/admin';
 import { Card, Avatar, Button, Notice } from '@/components/ui';
+import { useCloseOnSuccess } from '@/components/money/form-result';
 import type { Member } from '@/lib/types';
 
 function Label({ children }: { children: string }) {
@@ -15,6 +16,8 @@ export default function ApprovalRow({ member }: { member: Member }) {
   const [approveState, approve] = useFormState(approveMember, {});
   const [rejectState, reject] = useFormState(rejectMember, {});
   const [showReject, setShowReject] = useState(false);
+
+  useCloseOnSuccess(rejectState.ok, () => setShowReject(false));
 
   const err = approveState.error || rejectState.error;
 

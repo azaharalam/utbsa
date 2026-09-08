@@ -1,69 +1,132 @@
 import 'server-only';
 import { sql } from '@/lib/db';
 import { audit } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import { estimateFee } from '@/lib/money';
 import type { Member } from '@/lib/types';
 import type { TicketOrder, Rsvp } from '@/lib/money';
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'events'))) {
+    throw new Error('You do not have access to this.');
+  }
 }
 
 // ───────────────────────── RSVP ─────────────────────────
 
-export async function myRsvp(memberId: string, eventId: string): Promise<Rsvp | null> {
-  const rows = await sql<Rsvp[]>`
+/**
+ * An RSVP is a HOUSEHOLD answer, not a personal one.
+ *
+ * Rafid and Rumana are two accounts, one car, two plates. Before households,
+ * both would answer and the headcount said four. Now whoever answers first
+ * answers for both, and the other sees who did and can change it.
+ */
+
+export type HouseholdRsvp = {
+  id: string; event_id: string; member_id: string; member_name: string;
+  household_id: string | null; adults: number; children: number;
+  note: string | null; checked_in_at: string | null; created_at: string;
+  household_names?: string | null;
+};
+
+export async function myRsvp(memberId: string, eventId: string): Promise<HouseholdRsvp | null> {
+  const rows = await sql<HouseholdRsvp[]>`
     select r.*, m.full_name as member_name
-    from rsvps r join members m on m.id = r.member_id
-    where r.member_id = ${memberId} and r.event_id = ${eventId}
+    from rsvps r
+    join members m on m.id = r.member_id
+    where r.event_id = ${eventId}
+      and (r.member_id = ${memberId}
+           or (r.household_id is not null and r.household_id = (
+                 select household_id from members where id = ${memberId})))
+    limit 1
   `;
   return rows[0] ?? null;
 }
 
-/** Upsert, so clicking twice edits rather than erroring. */
 export async function setRsvp(
-  memberId: string, eventId: string, guestCount: number, note: string | null
+  memberId: string, eventId: string,
+  adults: number, children: number, note: string | null
 ) {
-  if (guestCount < 0 || guestCount > 20) throw new Error('Guest count looks wrong.');
+  if (adults < 1 || adults > 20) throw new Error('That number of adults looks wrong.');
+  if (children < 0 || children > 20) throw new Error('That number of children looks wrong.');
+
+  const [me] = await sql<{ household_id: string | null }[]>`
+    select household_id from members where id = ${memberId}
+  `;
+
+  // Replace whatever this household already said, whoever said it.
+  const existing = await myRsvp(memberId, eventId);
+
+  if (existing) {
+    await sql`
+      update rsvps
+      set member_id = ${memberId}, household_id = ${me?.household_id ?? null},
+          adults = ${adults}, children = ${children}, note = ${note}
+      where id = ${existing.id}
+    `;
+    return;
+  }
+
   await sql`
-    insert into rsvps (event_id, member_id, guest_count, note)
-    values (${eventId}, ${memberId}, ${guestCount}, ${note})
+    insert into rsvps (event_id, member_id, household_id, adults, children, note)
+    values (${eventId}, ${memberId}, ${me?.household_id ?? null},
+            ${adults}, ${children}, ${note})
     on conflict (event_id, member_id)
-    do update set guest_count = excluded.guest_count, note = excluded.note
+    do update set adults = excluded.adults, children = excluded.children,
+                  note = excluded.note, household_id = excluded.household_id
   `;
 }
 
 export async function cancelRsvp(memberId: string, eventId: string) {
-  await sql`delete from rsvps where member_id = ${memberId} and event_id = ${eventId}`;
+  const existing = await myRsvp(memberId, eventId);
+  if (!existing) return;
+  await sql`delete from rsvps where id = ${existing.id}`;
 }
 
-/** Headcount for the food order: members plus their guests. */
+/**
+ * The number that decides how much food to order.
+ *
+ * Children under three are not counted — they eat off a parent's plate, and
+ * counting them inflates the order and the chair count for nothing.
+ */
 export async function eventHeadcount(eventId: string) {
-  const [row] = await sql<{ people: string; guests: string; parties: string }[]>`
-    select coalesce(count(*), 0)::text as parties,
-           coalesce(sum(guest_count), 0)::text as guests,
-           coalesce(count(*) + sum(guest_count), 0)::text as people
+  const [row] = await sql<{ households: string; adults: string; children: string }[]>`
+    select count(*)::text as households,
+           coalesce(sum(adults), 0)::text as adults,
+           coalesce(sum(children), 0)::text as children
     from rsvps where event_id = ${eventId}
   `;
+  const adults = Number(row.adults);
+  const children = Number(row.children);
   return {
-    parties: Number(row.parties),
-    guests: Number(row.guests),
-    people: Number(row.people),
+    households: Number(row.households),
+    adults, children,
+    people: adults + children,
   };
 }
 
-export async function eventRsvps(actor: Member, eventId: string): Promise<Rsvp[]> {
-  assertAdmin(actor);
-  return sql<Rsvp[]>`
-    select r.*, m.full_name as member_name
-    from rsvps r join members m on m.id = r.member_id
+/** Who is coming. Only those who answered yes — never the whole membership. */
+export async function eventRsvps(eventId: string): Promise<HouseholdRsvp[]> {
+  return sql<HouseholdRsvp[]>`
+    select r.*, m.full_name as member_name,
+           (select string_agg(hm.full_name, ' and ' order by hm.created_at)
+            from members hm
+            where r.household_id is not null and hm.household_id = r.household_id
+           ) as household_names
+    from rsvps r
+    join members m on m.id = r.member_id
     where r.event_id = ${eventId}
     order by m.full_name
   `;
 }
 
 export async function checkIn(actor: Member, rsvpId: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   await sql`update rsvps set checked_in_at = now() where id = ${rsvpId}`;
   await audit(actor.id, 'event.check_in', 'rsvp', rsvpId);
 }
@@ -92,7 +155,7 @@ export function priceFor(
 }
 
 export async function eventOrders(actor: Member, eventId: string): Promise<TicketOrder[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<TicketOrder[]>`
     select * from ticket_orders where event_id = ${eventId}
     order by created_at desc
@@ -107,7 +170,7 @@ export async function recordTicketSale(
     amountCents: number; method: string;
   }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
 
   const id = await sql.begin(async (tx) => {
     const [row] = await tx<{ id: string }[]>`
@@ -140,7 +203,7 @@ export async function recordTicketSale(
 
 /** What cancelling would cost, shown before the admin confirms. */
 export async function refundPreview(actor: Member, eventId: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const rows = await sql<{ method: string; n: string; total: string }[]>`
     select method, count(*)::text as n, sum(amount_cents)::text as total
     from ticket_orders
@@ -167,7 +230,7 @@ export async function refundPreview(actor: Member, eventId: string) {
  * partial states, and a ledger that stops balancing. No-shows get nothing.
  */
 export async function cancelAndRefund(actor: Member, eventId: string, reason: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   if (!reason.trim()) throw new Error('A reason is required.');
 
   const preview = await refundPreview(actor, eventId);
@@ -232,7 +295,7 @@ export async function requestStatusChange(
 }
 
 export async function pendingStatusRequests(actor: Member) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<any[]>`
     select r.*, m.full_name as member_name, m.email as member_email
     from status_change_requests r
@@ -253,7 +316,7 @@ export async function pendingStatusRequests(actor: Member) {
 export async function decideStatusRequest(
   actor: Member, requestId: string, decision: 'approved' | 'declined', note: string | null
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
 
   await sql.begin(async (tx) => {
     const [req] = await tx<{ member_id: string; to_type: string }[]>`
@@ -266,6 +329,17 @@ export async function decideStatusRequest(
 
     if (decision === 'approved') {
       await tx`update members set member_type = ${req.to_type} where id = ${req.member_id}`;
+      // A student becoming an alum should now be written to at their personal
+      // address, since the university one is about to stop working.
+      await tx`
+        update members
+        set email = case
+          when member_type = 'student'
+            then coalesce(university_email, personal_email, email)
+          else coalesce(personal_email, university_email, email)
+        end
+        where id = ${req.member_id}
+      `;
     }
   });
 

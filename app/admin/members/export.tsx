@@ -3,7 +3,7 @@
 import type { Member } from '@/lib/types';
 
 const COLUMNS: (keyof Member)[] = [
-  'full_name', 'email', 'phone', 'member_type', 'student_level',
+  'full_name', 'email', 'university_email', 'personal_email', 'phone', 'member_type', 'student_level',
   'department', 'hometown_bd', 'arrival_semester', 'arrival_year', 'status', 'role', 'created_at',
 ];
 

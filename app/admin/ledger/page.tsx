@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { entries, totals } from '@/lib/queries/ledger';
 import { funds } from '@/lib/queries/donations';
 import { sql } from '@/lib/db';
@@ -21,7 +21,7 @@ const labels: Record<string, string> = {
 const label = (c: string) => labels[c] ?? c;
 
 export default async function Ledger({ searchParams }: { searchParams: { term?: string } }) {
-  const me = await requireAdmin();
+  const me = await requirePermission('money');
 
   const [rows, sums, fundList, terms] = await Promise.all([
     entries(me, { termId: searchParams.term }),

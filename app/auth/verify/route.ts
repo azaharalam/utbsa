@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const consumed = await Tokens.consumeToken(token);
   if (!consumed) return NextResponse.redirect(`${origin}/auth/login?error=expired`);
 
+  // findByEmail matches any of the member's addresses.
   const member = await Members.findByEmail(consumed.email);
   if (!member) return NextResponse.redirect(`${origin}/auth/login?error=nouser`);
 

@@ -31,10 +31,13 @@ export type DonorType =
 export type EventType = 'cultural' | 'social' | 'orientation' | 'sporting';
 
 export type Settings = {
-  payments_enabled: boolean;
-  fee_mode: 'absorb' | 'pass_through' | 'optional';
+  current_session: string;
   dues_default_cents: number;
   org_email: string | null;
+  pay_method_label: string;
+  pay_to_name: string;
+  pay_to_handle: string;
+  pay_instructions: string | null;
 };
 
 export type MemberBalance = {

@@ -51,10 +51,13 @@ export default async function Home() {
           <Card>
             <p className="mb-1.5 font-display text-sm font-semibold text-kantha">New here</p>
             <h2 className="mb-2 font-display text-lg font-bold">Just landed in Toledo?</h2>
-            <p className="text-sm text-ink-mid">
+            <p className="mb-3 text-sm text-ink-mid">
               Airport pickup, a place to sleep for a few nights, a mattress someone is leaving
               behind. Ask us before you pay for any of it.
             </p>
+            <Link href="/arrive" className="text-sm font-semibold text-kantha">
+              Tell us when you land →
+            </Link>
           </Card>
           <Card>
             <p className="mb-1.5 font-display text-sm font-semibold text-kantha">Membership</p>

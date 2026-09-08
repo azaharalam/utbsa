@@ -4,7 +4,9 @@ export type Role = 'member' | 'admin';
 export type Member = {
   id: string;
   full_name: string;
-  email: string;
+  email: string;                       // the address we send to
+  university_email: string | null;     // proof of UToledo, may be dead
+  personal_email: string | null;       // survives graduation
   phone: string | null;
   heard_from: string | null;
   photo_url: string | null;
@@ -25,7 +27,7 @@ export type Member = {
   show_department: boolean;
   show_hometown: boolean;
   in_directory: boolean;
-  household_id: string | null;
+  household_id: string | null;   // attendance only — never dues
   status: MemberStatus;
   role: Role;
   email_verified_at: string | null;
@@ -46,8 +48,6 @@ export type DirectoryEntry = {
   phone: string | null;
   department: string | null;
   hometown_bd: string | null;
-  arrival_semester: string | null;
-  arrival_year: number | null;
 };
 
 export type EventRow = {
@@ -63,6 +63,7 @@ export type EventRow = {
   location_addr: string | null;
   is_public: boolean;
   is_published: boolean;
+  is_potluck: boolean;
 };
 
 export type Post = {
@@ -87,7 +88,7 @@ export type Term = {
 };
 
 export type Officer = {
-  id: string; title: string; sort_order: number;
+  id: string; title: string; sort_order: number; session?: string;
   member_id: string; full_name: string; photo_url: string | null;
   department: string | null; email: string;
 };

@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { requestStatusChange } from '@/app/actions/money';
 import { Card, Notice, Field } from '@/components/ui';
+import { useCloseOnSuccess } from '@/components/money/form-result';
 import { Submit } from '@/components/money/forms';
 
 export default function GraduateBox({ memberType }: { memberType: string }) {
   const [state, action] = useFormState(requestStatusChange, {});
   const [open, setOpen] = useState(false);
+
+  useCloseOnSuccess(state.ok, () => setOpen(false));
 
   if (memberType !== 'student') return null;
 

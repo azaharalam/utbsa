@@ -5,13 +5,8 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { recordPayment } from '@/app/actions/money';
 import { Card, Notice, Field } from '@/components/ui';
 import { Submit } from '@/components/money/forms';
+import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
 import { SEASONS, yearOptions } from '@/lib/money';
-
-function Clear({ ok, formRef }: { ok?: string; formRef: React.RefObject<HTMLFormElement> }) {
-  const { pending } = useFormStatus();
-  useEffect(() => { if (ok && !pending) formRef.current?.reset(); }, [ok, pending, formRef]);
-  return null;
-}
 
 export default function PaymentForm({
   members, funds,
@@ -37,10 +32,10 @@ export default function PaymentForm({
       </p>
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      <Confirmation message={state.ok} />
 
       <form action={action} ref={formRef}>
-        <Clear ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state.ok} formRef={formRef} />
 
         <Field label="Member" name="member_id" as="select"
           options={members.map((m) => ({

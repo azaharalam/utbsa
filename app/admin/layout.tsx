@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/session';
+import { permissionsFor } from '@/lib/permissions';
 import PortalNav from '@/components/portal-nav';
 import { Avatar } from '@/components/ui';
 
@@ -7,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
+  const perms = await permissionsFor(me.id);
+  const has = (p: string) => perms.includes(p as any);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -30,17 +33,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <PortalNav
           items={[
             { href: '/admin', label: 'Overview' },
-            { href: '/admin/approvals', label: 'Approvals' },
-            { href: '/admin/members', label: 'Members' },
-            { href: '/admin/requests', label: 'Requests' },
-            { href: '/admin/dues', label: 'Dues' },
-            { href: '/admin/donations', label: 'Donations' },
-            { href: '/admin/funds', label: 'Funds' },
-            { href: '/admin/ledger', label: 'Ledger' },
-            { href: '/admin/posts', label: 'Posts' },
-            { href: '/admin/events', label: 'Events' },
-            { href: '/admin/eboard', label: 'E-board' },
-            { href: '/admin/settings', label: 'Settings' },
+            { href: '/admin/finances', label: 'Finances' },
+            ...(has('members') ? [
+              { href: '/admin/approvals', label: 'Approvals' },
+              { href: '/admin/members', label: 'Members' },
+              { href: '/admin/requests', label: 'Status changes' },
+              { href: '/admin/messages', label: 'Messages' },
+              { href: '/admin/arrivals', label: 'Arrivals' },
+            ] : []),
+            ...(has('money') ? [
+              { href: '/admin/dues', label: 'Dues' },
+              { href: '/admin/claims', label: 'Transfers' },
+              { href: '/admin/donations', label: 'Donations' },
+              { href: '/admin/funds', label: 'Funds' },
+              { href: '/admin/ledger', label: 'Ledger' },
+              { href: '/admin/sponsors', label: 'Sponsors' },
+            ] : []),
+            ...(has('content') ? [{ href: '/admin/posts', label: 'Posts' }] : []),
+            ...(has('events') ? [{ href: '/admin/events', label: 'Events' }] : []),
+            ...(has('elections') ? [{ href: '/admin/elections', label: 'Elections' }] : []),
+            { href: '/admin/offices', label: 'Offices' },
+            ...(has('roles') ? [
+              { href: '/admin/activity', label: 'Activity' },
+              { href: '/admin/settings', label: 'Settings' },
+            ] : []),
           ]}
         />
         <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>

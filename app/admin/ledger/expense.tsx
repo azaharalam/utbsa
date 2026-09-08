@@ -5,13 +5,8 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { recordExpense } from '@/app/actions/money';
 import { Card, Notice, Field } from '@/components/ui';
 import { Submit } from '@/components/money/forms';
+import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
 import { EXPENSE_CATEGORIES } from '@/lib/money';
-
-function Clear({ ok, formRef }: { ok?: string; formRef: React.RefObject<HTMLFormElement> }) {
-  const { pending } = useFormStatus();
-  useEffect(() => { if (ok && !pending) formRef.current?.reset(); }, [ok, pending, formRef]);
-  return null;
-}
 
 export default function ExpenseForm({ funds }: { funds: { id: string; name: string }[] }) {
   const [state, action] = useFormState(recordExpense, {});
@@ -28,10 +23,10 @@ export default function ExpenseForm({ funds }: { funds: { id: string; name: stri
       </p>
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      <Confirmation message={state.ok} />
 
       <form action={action} ref={formRef}>
-        <Clear ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state.ok} formRef={formRef} />
 
         <div className="grid gap-x-4 sm:grid-cols-2">
           <Field label="Amount" name="amount" placeholder="120.00" required />

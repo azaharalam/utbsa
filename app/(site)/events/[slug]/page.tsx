@@ -4,7 +4,11 @@ import { getCurrentMember } from '@/lib/session';
 import { eventBySlug } from '@/lib/queries/content';
 import { Card, Pill } from '@/components/ui';
 import RsvpBox from '@/components/money/rsvp';
-import { myRsvp, eventHeadcount } from '@/lib/queries/tickets';
+import PotluckBoard from '@/components/money/potluck-board';
+import AddToCalendar from '@/components/money/add-to-calendar';
+import { myRsvp, eventHeadcount, eventRsvps } from '@/lib/queries/tickets';
+import { itemsFor } from '@/lib/queries/potluck';
+import { householdOf } from '@/lib/queries/households';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,16 +21,41 @@ export default async function EventPage({ params }: { params: { slug: string } }
   const isPast = start < new Date();
 
   const canRsvp = !!me && ['active', 'inactive', 'alumni'].includes(me.status);
-  const [existing, headcount] = await Promise.all([
+
+  const [existing, headcount, household, potluck, attending] = await Promise.all([
     canRsvp ? myRsvp(me!.id, e.id) : Promise.resolve(null),
     eventHeadcount(e.id),
+    canRsvp ? householdOf(me!.id) : Promise.resolve([]),
+    e.is_potluck ? itemsFor(e.id) : Promise.resolve([]),
+    canRsvp ? eventRsvps(e.id) : Promise.resolve([]),
   ]);
+
+  // Somebody else in the household may already have answered for both.
+  const answeredBy = existing && existing.member_id !== me?.id
+    ? existing.member_name : null;
+
+  const calendar = {
+    title: e.title,
+    description: e.description,
+    location: [e.location_name, e.location_addr].filter(Boolean).join(', '),
+    startsAt: e.starts_at,
+    endsAt: e.ends_at,
+  };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <Link href="/events" className="mb-6 inline-block text-sm text-kantha">← All events</Link>
 
       {isPast && <div className="mb-4"><Pill tone="grey">This event has passed</Pill></div>}
+      {!isPast && !canRsvp && (
+        <div className="mb-4">
+          <AddToCalendar event={{
+            title: e.title, description: e.description,
+            location: [e.location_name, e.location_addr].filter(Boolean).join(', '),
+            startsAt: e.starts_at, endsAt: e.ends_at,
+          }} slug={e.slug} />
+        </div>
+      )}
 
       <h1 className="mb-2 font-display text-3xl font-bold sm:text-4xl">{e.title}</h1>
       {e.bengali_title && <p className="mb-4 font-display text-xl text-ink-mid">{e.bengali_title}</p>}
@@ -55,16 +84,55 @@ export default async function EventPage({ params }: { params: { slug: string } }
       {e.description && <p className="whitespace-pre-line text-[15px] leading-relaxed">{e.description}</p>}
 
       {!isPast && canRsvp && (
-        <RsvpBox eventId={e.id} existing={existing} headcount={headcount} />
+        <RsvpBox eventId={e.id} existing={existing} headcount={headcount}
+          household={household.map((h) => ({ id: h.id, full_name: h.full_name }))}
+          answeredBy={answeredBy} calendar={calendar} slug={e.slug} />
+      )}
+
+      {e.is_potluck && potluck.length > 0 && (
+        <PotluckBoard items={potluck} meId={me?.id ?? null}
+          myHouseholdId={household[0] ? (me as any)?.household_id ?? null : null}
+          canClaim={canRsvp && !isPast} />
+      )}
+
+      {/* Only those who said yes. Never the whole membership. */}
+      {!isPast && canRsvp && attending.length > 0 && (
+        <Card className="mt-6">
+          <h2 className="mb-1 font-display text-lg font-bold">Who is coming</h2>
+          <p className="mb-3 text-sm text-ink-mid">
+            {headcount.people} {headcount.people === 1 ? 'person' : 'people'} from{' '}
+            {headcount.households} {headcount.households === 1 ? 'household' : 'households'}
+            {headcount.children > 0 && `, including ${headcount.children} children`}.
+          </p>
+          <ul className="space-y-1.5 text-sm">
+            {attending.map((r) => {
+              const extra = r.adults - 1 + r.children;
+              return (
+                <li key={r.id}>
+                  {r.household_names ?? r.member_name}
+                  {extra > 0 && (
+                    <span className="text-ink-mid">
+                      {' '}+{extra}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
 
       {!isPast && !canRsvp && (
         <div className="mt-8 rounded-xl border-2 border-dashed border-stitch bg-white/60 p-5">
           <p className="mb-1 font-display font-bold">Sign in to RSVP</p>
-          <p className="text-sm text-ink-mid">
-            Members can tell us they are coming, and how many they are bringing, so we
+          <p className="mb-3 text-sm text-ink-mid">
+            Members tell us they are coming, and how many they are bringing, so we
             order the right amount of food.
           </p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/auth/login" className="text-sm font-semibold text-kantha">Sign in</Link>
+            <Link href="/join" className="text-sm font-semibold text-kantha">Join UTBSA</Link>
+          </div>
         </div>
       )}
     </div>

@@ -1,18 +1,26 @@
 import 'server-only';
 import { sql } from '@/lib/db';
 import { audit } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
 import type { LedgerEntry } from '@/lib/money';
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'money'))) {
+    throw new Error('You do not have access to this.');
+  }
 }
 
 export async function entries(
   actor: Member,
   opts: { termId?: string; category?: string; fundId?: string; limit?: number } = {}
 ): Promise<LedgerEntry[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<LedgerEntry[]>`
     select le.id, le.occurred_on::text, le.direction, le.category,
            le.amount_cents, le.note, le.source_type, f.name as fund_name
@@ -27,7 +35,7 @@ export async function entries(
 }
 
 export async function totals(actor: Member, termId?: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const rows = await sql<{ direction: string; category: string; total: string }[]>`
     select direction, category, sum(amount_cents)::text as total
     from ledger_entries
@@ -47,7 +55,7 @@ export async function totals(actor: Member, termId?: string) {
 
 /** Recorded, because exporting the whole ledger is worth a trace. */
 export async function recordExport(actor: Member, what: string, rowCount: number) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   await audit(actor.id, 'export', 'ledger', undefined, { what, rows: rowCount });
 }
 
@@ -56,7 +64,7 @@ export async function recordExpense(
   actor: Member,
   e: { amountCents: number; category: string; occurredOn: string; note: string; fundId?: string | null; termId?: string | null }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   if (e.amountCents <= 0) throw new Error('Amount must be more than zero.');
 
   const [row] = await sql<{ id: string }[]>`

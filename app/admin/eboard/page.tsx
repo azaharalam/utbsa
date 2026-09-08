@@ -1,43 +1,49 @@
-import { requireAdmin } from '@/lib/session';
-import { officers, currentTerm } from '@/lib/queries/content';
-import { listAll } from '@/lib/queries/members';
-import { Card, Avatar, Empty } from '@/components/ui';
-import OfficerForm from './form';
+import Link from 'next/link';
+import { requirePermission } from '@/lib/session';
+import { officers } from '@/lib/queries/content';
+import { getSettings } from '@/lib/queries/settings';
+import { Card, Avatar, Empty, Button } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'E-board' };
 
+/**
+ * A read-only view of what the public sees. Assigning and ending offices
+ * happens on /admin/offices, so there is one place where access changes hands.
+ */
 export default async function EBoardAdmin() {
-  const me = await requireAdmin();
-  const [term, board, members] = await Promise.all([
-    currentTerm(), officers(), listAll(me, { status: 'active' }),
-  ]);
+  await requirePermission('roles');
+  const [settings, board] = await Promise.all([getSettings(), officers()]);
 
   return (
     <>
       <h1 className="mb-1 font-display text-2xl font-bold sm:text-3xl">E-board</h1>
-      <p className="mb-6 text-sm text-ink-mid">Current term: {term?.name ?? 'none set'}</p>
+      <p className="mb-6 max-w-2xl text-sm text-ink-mid">
+        The board for {settings.current_session}, exactly as it appears on the
+        public page. To change who holds an office, go to{' '}
+        <Link href="/admin/offices" className="font-semibold text-kantha">Offices</Link>.
+      </p>
 
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-        <OfficerForm members={members.map((m) => ({ id: m.id, name: m.full_name }))} />
-
+      {board.length ? (
         <div className="space-y-3">
-          <h2 className="font-display text-lg font-bold">This year&apos;s board</h2>
-          {board.length ? (
-            board.map((o) => (
-              <Card key={o.id} className="flex items-center gap-3 p-4">
-                <Avatar name={o.full_name} url={o.photo_url} size={40} />
-                <div className="min-w-0">
-                  <p className="truncate font-display text-[15px] font-bold">{o.full_name}</p>
-                  <p className="text-sm text-kantha">{o.title}</p>
-                </div>
-              </Card>
-            ))
-          ) : (
-            <Empty title="No officers yet" body="Add them with the form. They appear on the public e-board page immediately." />
-          )}
+          {board.map((o) => (
+            <Card key={o.id} className="flex items-center gap-3 p-4">
+              <Avatar name={o.full_name} url={o.photo_url} size={40} />
+              <div className="min-w-0">
+                <p className="font-display text-[15px] font-bold">{o.full_name}</p>
+                <p className="text-sm text-kantha">{o.title}</p>
+                {o.department && <p className="text-xs text-ink-mid">{o.department}</p>}
+              </div>
+            </Card>
+          ))}
         </div>
-      </div>
+      ) : (
+        <Empty
+          title="Nobody on the board yet"
+          body={`No offices are held for ${settings.current_session}. Assign them from the Offices page.`}
+          action={<Button href="/admin/offices">Go to Offices</Button>}
+        />
+      )}
     </>
   );
 }

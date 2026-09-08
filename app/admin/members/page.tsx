@@ -1,6 +1,7 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { listAll, statusCounts } from '@/lib/queries/members';
 import { Card, Pill, Avatar, Empty } from '@/components/ui';
+import { currentOffices } from '@/lib/queries/offices';
 import MemberControls from './controls';
 import ExportButton from './export';
 
@@ -44,14 +45,16 @@ const tones: Record<string, string> = {
 };
 
 export default async function Members({ searchParams }: { searchParams: { status?: string; q?: string } }) {
-  const me = await requireAdmin();
+  const me = await requirePermission('members');
   const status = searchParams.status ?? '';
   const q = searchParams.q ?? '';
 
-  const [members, counts] = await Promise.all([
+  const [members, counts, offices] = await Promise.all([
     listAll(me, { status: status || undefined, q }),
     statusCounts(me),
+    currentOffices(),
   ]);
+  const officeOf = new Map(offices.map((o) => [o.member_id, o.title]));
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -91,14 +94,21 @@ export default async function Members({ searchParams }: { searchParams: { status
                   <div className="min-w-0">
                     <p className="truncate font-display text-[15px] font-bold">
                       {m.full_name}
-                      {m.role === 'admin' && (
-                        <span className="ml-2 text-xs font-semibold text-genda">(admin)</span>
+                      {officeOf.has(m.id) && (
+                        <span className="ml-2 text-xs font-semibold text-genda">
+                          ({officeOf.get(m.id)})
+                        </span>
                       )}
                     </p>
                     <p className="truncate text-xs text-ink-mid">
                       {m.email}
                       {m.show_phone && m.phone ? ` | ${m.phone}` : ''}
                     </p>
+                    {m.university_email && m.personal_email && (
+                      <p className="truncate text-xs text-ink-mid">
+                        also {m.email === m.university_email ? m.personal_email : m.university_email}
+                      </p>
+                    )}
                     <p className="text-xs text-ink-mid">
                       {describe(m)}
                     </p>

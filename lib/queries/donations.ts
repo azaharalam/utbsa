@@ -1,11 +1,19 @@
 import 'server-only';
 import { sql } from '@/lib/db';
-import { audit } from '@/lib/audit';
+import { audit, tracked, trackedCreate } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
 import type { Fund, Donor, Donation, DonorType } from '@/lib/money';
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'money'))) {
+    throw new Error('You do not have access to this.');
+  }
 }
 
 /**
@@ -16,7 +24,7 @@ function assertAdmin(actor: Member) {
  * fund look richer than it is.
  */
 export async function funds(actor: Member): Promise<Fund[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<Fund[]>`
     select f.id, f.name, f.is_restricted, f.description,
       (coalesce((select sum(amount_cents) from donations d
@@ -29,14 +37,56 @@ export async function funds(actor: Member): Promise<Fund[]> {
   `;
 }
 
-export async function createFund(actor: Member, name: string, restricted: boolean, description: string | null) {
-  assertAdmin(actor);
+export async function createFund(
+  actor: Member,
+  f: {
+    name: string;
+    description?: string | null;
+    isRestricted: boolean;
+    /**
+     * Money already in hand for this fund. Recorded as a real donation from a
+     * named donor on a date — never as a typed-in balance.
+     *
+     * A balance somebody typed is a number nobody can explain. "Why does
+     * Boishakh have $300?" has an answer only if that $300 is a gift with a
+     * donor and a date behind it.
+     */
+    opening?: {
+      donorName: string; donorType: string; amountCents: number;
+      receivedOn?: string | null; note?: string | null;
+    } | null;
+  }
+) {
+  await assertAdmin(actor);
+  if (!f.name.trim()) throw new Error('Give the fund a name.');
+
   const [row] = await sql<{ id: string }[]>`
-    insert into funds (name, is_restricted, description)
-    values (${name.trim()}, ${restricted}, ${description})
+    insert into funds (name, description, is_restricted)
+    values (${f.name.trim()}, ${f.description ?? null}, ${f.isRestricted})
     returning id
   `;
-  await audit(actor.id, 'fund.create', 'fund', row.id, { name: name.trim() });
+  await trackedCreate(actor.id, 'funds', row.id, 'fund.create');
+
+  if (f.opening && f.opening.amountCents > 0) {
+    if (!f.opening.donorName.trim()) {
+      throw new Error('An opening gift needs a donor — who gave it?');
+    }
+    const donorId = await findOrCreateDonor(actor, {
+      name: f.opening.donorName, email: null,
+      type: f.opening.donorType as DonorType,
+    });
+
+    await recordDonation(actor, {
+      donorId,
+      fundId: row.id,
+      amountCents: f.opening.amountCents,
+      receivedOn: f.opening.receivedOn ?? new Date().toISOString().slice(0, 10),
+      method: 'other',
+      isInKind: false,
+      note: f.opening.note ?? `Opening gift for ${f.name.trim()}`,
+    });
+  }
+
   return row.id;
 }
 
@@ -53,17 +103,18 @@ export async function generalFundId(): Promise<string> {
 
 /** Move a gift into a different fund, from the gift list. */
 export async function reassignFund(actor: Member, donationId: string, fundId: string) {
-  assertAdmin(actor);
-  await sql.begin(async (tx) => {
-    await tx`update donations set fund_id = ${fundId} where id = ${donationId}`;
-    await tx`update ledger_entries set fund_id = ${fundId}
-             where source_type = 'donation' and source_id = ${donationId}`;
+  await assertAdmin(actor);
+  await tracked(actor.id, 'donations', donationId, 'donation.reassign', async () => {
+    await sql.begin(async (tx) => {
+      await tx`update donations set fund_id = ${fundId} where id = ${donationId}`;
+      await tx`update ledger_entries set fund_id = ${fundId}
+               where source_type = 'donation' and source_id = ${donationId}`;
+    });
   });
-  await audit(actor.id, 'donation.reassign', 'donation', donationId, { fund_id: fundId });
 }
 
 export async function donors(actor: Member, q = ''): Promise<Donor[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const term = `%${q.trim()}%`;
   return sql<Donor[]>`
     select d.*,
@@ -79,7 +130,7 @@ export async function findOrCreateDonor(
   actor: Member,
   d: { name: string; email: string | null; type: DonorType; memberId?: string | null }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
 
   if (d.email) {
     const [existing] = await sql<{ id: string }[]>`
@@ -101,7 +152,7 @@ export async function donations(
   actor: Member,
   opts: { fundId?: string; unacknowledged?: boolean } = {}
 ): Promise<Donation[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<Donation[]>`
     select d.*, dr.name as donor_name, f.name as fund_name
     from donations d
@@ -122,7 +173,7 @@ export async function recordDonation(
     note?: string | null;
   }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   if (d.amountCents <= 0) throw new Error('Amount must be more than zero.');
 
   const id = await sql.begin(async (tx) => {
@@ -148,16 +199,14 @@ export async function recordDonation(
     return row.id;
   });
 
-  await audit(actor.id, 'donation.record', 'donation', id, {
-    amount_cents: d.amountCents, in_kind: d.isInKind,
-  });
-
+  await trackedCreate(actor.id, 'donations', id, 'donation.record');
   return id;
 }
 
 /** Donors who are not thanked do not give twice. */
 export async function acknowledge(actor: Member, donationId: string) {
-  assertAdmin(actor);
-  await sql`update donations set acknowledged_at = now() where id = ${donationId}`;
-  await audit(actor.id, 'donation.acknowledge', 'donation', donationId);
+  await assertAdmin(actor);
+  await tracked(actor.id, 'donations', donationId, 'donation.acknowledge', async () => {
+    await sql`update donations set acknowledged_at = now() where id = ${donationId}`;
+  });
 }

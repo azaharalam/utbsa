@@ -7,9 +7,22 @@
  * Every failure prints the exact fix.
  */
 import './env';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import postgres from 'postgres';
+
+/** Every file under a directory, for whole-tree greps. */
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  try {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) out.push(...walk(full));
+      else out.push(full);
+    }
+  } catch { /* directory may not exist */ }
+  return out;
+}
 
 const root = process.cwd();
 let pass = 0, warn = 0, fail = 0;
@@ -34,6 +47,24 @@ function head(t: string) { console.log(`\n\x1b[1m${t}\x1b[0m`); }
 const read = (p: string) => { try { return readFileSync(join(root, p), 'utf8'); } catch { return null; } };
 
 const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
+
+/**
+ * A failing check must never take the whole report down. If a migration has
+ * not run, the checks that depend on it should say so and the other forty
+ * should still tell you what they know.
+ */
+async function check(label: string, fn: () => Promise<void>) {
+  try {
+    await fn();
+  } catch (e) {
+    const msg = (e as Error).message ?? String(e);
+    if (/column .* does not exist|relation .* does not exist/.test(msg)) {
+      bad(`${label}: the schema is behind`, 'npm run db:migrate');
+    } else {
+      bad(`${label}: ${msg.split('\n')[0]}`);
+    }
+  }
+}
 
 async function main() {
   console.log('\n\x1b[1mUTBSA — checking Phase 1 and Phase 2\x1b[0m');
@@ -75,6 +106,24 @@ async function main() {
     ['lib/queries/donations.ts', 'donations and funds'],
     ['lib/queries/ledger.ts', 'ledger'],
     ['lib/queries/settings.ts', 'settings'],
+    ['lib/queries/claims.ts', 'transfer claims'],
+    ['lib/queries/elections.ts', 'elections'],
+    ['lib/queries/offices.ts', 'offices and handover'],
+    ['lib/queries/inbox.ts', 'messages and activity log'],
+    ['lib/queries/community.ts', 'arrivals, giveaway, housing, jobs'],
+    ['lib/permissions.ts', 'permission model'],
+    ['lib/sessions.ts', 'academic sessions'],
+    ['lib/emails.ts', 'two-address login'],
+    ['lib/sponsors.ts', 'sponsor tiers'],
+    ['lib/potluck.ts', 'potluck categories'],
+    ['lib/queries/potluck.ts', 'potluck items'],
+    ['lib/queries/households.ts', 'household linking'],
+    ['lib/queries/pulse.ts', 'community activity feed'],
+    ['lib/queries/overview.ts', 'admin overview'],
+    ['components/money/form-result.tsx', 'form success behaviour'],
+    ['lib/audit-display.ts', 'audit diff formatting'],
+    ['lib/calendar.ts', 'calendar links'],
+    ['lib/queries/sponsors.ts', 'sponsors and financial summary'],
     ['app/actions/auth.ts', 'signup and login'],
     ['app/actions/profile.ts', 'profile editing'],
     ['app/actions/admin.ts', 'admin actions'],
@@ -108,6 +157,7 @@ async function main() {
     ['app/portal/profile/page.tsx', 'profile'],
     ['app/portal/directory/page.tsx', 'directory'],
     ['app/portal/dues/page.tsx', 'my dues'],
+    ['app/portal/events/page.tsx', 'member events tab'],
     ['app/admin/page.tsx', 'admin overview'],
     ['app/admin/approvals/page.tsx', 'approvals'],
     ['app/admin/members/page.tsx', 'members'],
@@ -120,6 +170,24 @@ async function main() {
     ['app/admin/ledger/page.tsx', 'ledger'],
     ['app/admin/requests/page.tsx', 'status requests'],
     ['app/admin/settings/page.tsx', 'settings'],
+    ['app/admin/claims/page.tsx', 'transfers'],
+    ['app/admin/elections/page.tsx', 'elections'],
+    ['app/admin/offices/page.tsx', 'offices'],
+    ['app/admin/messages/page.tsx', 'contact inbox'],
+    ['app/admin/activity/page.tsx', 'activity log'],
+    ['app/admin/arrivals/page.tsx', 'arrivals admin'],
+    ['app/events/[slug]/calendar/route.ts', 'ics download'],
+    ['app/admin/sponsors/page.tsx', 'sponsor management'],
+    ['app/admin/finances/page.tsx', 'financial summary'],
+    ['app/(site)/sponsors/page.tsx', 'public sponsors page'],
+    ['app/(site)/arrive/page.tsx', 'public arrival form'],
+    ['app/portal/arrivals/page.tsx', 'volunteer board'],
+    ['app/portal/giveaway/page.tsx', 'giveaway board'],
+    ['app/portal/housing/page.tsx', 'housing board'],
+    ['app/portal/jobs/page.tsx', 'job board'],
+    ['app/admin/events/[id]/page.tsx', 'event detail and check-in'],
+    ['app/portal/election/page.tsx', 'member election page'],
+    ['app/pay/[token]/page.tsx', 'claim link landing page'],
   ];
   missing = 0;
   for (const [f, what] of pages) if (!existsSync(join(root, f))) { bad(`${f} missing — ${what}`); missing++; }
@@ -129,9 +197,11 @@ async function main() {
   head('Wiring');
   const adminNav = read('app/admin/layout.tsx') ?? '';
   for (const [href, label] of [
-    ['/admin/dues', 'Dues'],
+    ['/admin/dues', 'Dues'], ['/admin/claims', 'Transfers'],
+    ['/admin/messages', 'Messages'], ['/admin/activity', 'Activity'],
+    ['/admin/arrivals', 'Arrivals'],
     ['/admin/donations', 'Donations'], ['/admin/funds', 'Funds'],
-    ['/admin/ledger', 'Ledger'], ['/admin/requests', 'Requests'],
+    ['/admin/ledger', 'Ledger'], ['/admin/requests', 'Status changes'],
     ['/admin/settings', 'Settings'],
   ]) {
     if (adminNav.includes(href)) ok(`admin nav has ${label}`);
@@ -139,6 +209,9 @@ async function main() {
   }
 
   const portalNav = read('app/portal/layout.tsx') ?? '';
+  if (portalNav.includes('/portal/events')) ok('portal nav has Events');
+  else bad('portal nav is missing Events', "Add { href: '/portal/events', label: 'Events' }");
+
   if (portalNav.includes('/portal/dues')) ok('portal nav has My dues');
   else bad('portal nav is missing My dues', "Add { href: '/portal/dues', label: 'My dues' } to app/portal/layout.tsx");
 
@@ -151,8 +224,21 @@ async function main() {
   else bad('profile has no graduation request', 'The GraduateBox patch did not apply to app/portal/profile/form.tsx');
 
   const types = read('lib/types.ts') ?? '';
-  if (types.includes('household_id')) ok('Member type has household_id');
-  else bad('Member type is missing household_id', 'Add "household_id: string | null;" to Member in lib/types.ts');
+  if (types.includes('household_id')) ok('Member type has household_id (attendance only)');
+  else bad('Member type is missing household_id',
+           'Households drive RSVP now. Add "household_id: string | null;" to Member.');
+
+  const findFn = (read('lib/queries/members.ts') ?? '');
+  if (findFn.includes('lower(university_email)') && findFn.includes('lower(personal_email)')) {
+    ok('either address signs a member in');
+  } else {
+    bad('findByEmail only matches one address',
+        'A graduating member would be locked out when their UToledo account closes.');
+  }
+
+  if (types.includes('personal_email')) ok('Member type has personal_email');
+  else bad('Member type is missing personal_email',
+           'Add "personal_email: string | null;" to Member in lib/types.ts');
 
   // ══════════════════════ safety invariants ══════════════════════
   head('Safety rules');
@@ -168,9 +254,139 @@ async function main() {
   else bad('lib/queries/dues.ts has no assertAdmin');
 
   const selfEdit = members.match(/export type SelfEditable = \{[\s\S]*?\}/)?.[0] ?? '';
-  const leaked = ['role', 'status:', 'email:'].filter((f) => selfEdit.includes(f));
-  if (!leaked.length) ok('members cannot edit their own role or status');
+  // personal_email IS editable; the primary sign-in address is not.
+  const leaked = ['role:', 'status:', '\n  email:'].filter((f) => selfEdit.includes(f));
+  if (!leaked.length) ok('members cannot edit their own role, status, or sign-in email');
   else bad(`SelfEditable exposes ${leaked.join(', ')} — a member could promote themselves`);
+
+  // The refactor that nearly shipped broken: page guards moved to permissions
+  // while the query layer still checked members.role, so every officer who was
+  // not also flagged 'admin' was locked out of their own pages.
+  const queryFiles = [
+    'lib/queries/dues.ts', 'lib/queries/donations.ts', 'lib/queries/ledger.ts',
+    'lib/queries/claims.ts', 'lib/queries/members.ts', 'lib/queries/content.ts',
+    'lib/queries/tickets.ts', 'lib/queries/settings.ts',
+  ];
+  const stale = queryFiles.filter((f) => (read(f) ?? '').includes("role !== 'admin'"));
+  if (!stale.length) ok('query guards read the office, not an account flag');
+  else bad(`these still check members.role: ${stale.join(', ')}`,
+           'Officers who are not flagged admin will be refused by their own pages.');
+
+  // Data captured with nowhere to read it is worse than not capturing it.
+  const reachable: [string, string][] = [
+    ['contact_messages', 'app/admin/messages/page.tsx'],
+    ['audit_log', 'app/admin/activity/page.tsx'],
+    ['rsvps', 'app/admin/events/[id]/page.tsx'],
+    ['ticket_orders', 'app/admin/events/[id]/tickets.tsx'],
+  ];
+  const unreadable = reachable.filter(([, page]) => !existsSync(join(root, page)));
+  if (!unreadable.length) ok('every table the app writes to can be read somewhere');
+  else bad(`captured but unreadable: ${unreadable.map(([t]) => t).join(', ')}`,
+           'Data with no page to view it silently goes nowhere.');
+
+  // Copy that promises a feature which has since shipped is worse than no
+  // copy at all — members read it and stop looking.
+  const stalePages = ['app/portal/page.tsx', 'app/(site)/events/[slug]/page.tsx'];
+  const stalePromises = stalePages.filter((f) =>
+    /RSVP coming|coming soon|RSVP is coming/i.test(read(f) ?? ''));
+  if (!stalePromises.length) ok('no page promises a feature that already exists');
+  else bad(`stale "coming soon" copy in ${stalePromises.join(', ')}`,
+           'RSVP shipped in Phase 2 — members reading this will not look for it.');
+
+  // The admin overview must not tell a Treasurer about member approvals —
+  // they cannot act on it, so it is noise that trains people to ignore it.
+  const adminHome = read('app/admin/page.tsx') ?? '';
+  if (adminHome.includes("has('money')") && adminHome.includes("has('members')")) {
+    ok('admin overview is filtered by permission');
+  } else {
+    bad('admin overview shows the same thing to every officer',
+        'A Treasurer should not see the approval queue.');
+  }
+  if (adminHome.includes('QuickApprove')) ok('members can be approved from the overview');
+  else bad('admin overview has no inline approve');
+
+  // A form that discards its error state fails silently — the person clicks,
+  // nothing happens, and there is nothing on screen to explain why.
+  const clientFiles = walk(join(root, 'app'))
+    .concat(walk(join(root, 'components')))
+    .filter((f: string) => f.endsWith('.tsx'));
+  const clientForms = clientFiles;
+  const swallowing = clientForms.filter((f: string) => {
+    const src = readFileSync(f, 'utf8');
+    return /const \[\s*,\s*\w+\s*\]\s*=\s*useFormState/.test(src);
+  }).map((f: string) => f.replace(root + '/', ''));
+  if (!swallowing.length) ok('no form throws away its error state');
+  else bad(`these forms discard errors: ${swallowing.join(', ')}`,
+           'A failed action looks identical to a successful one.');
+
+  /**
+   * Every form must resolve when it succeeds.
+   *
+   * Three ways to do it, and which one is right depends on whether the person
+   * is about to do it again:
+   *
+   *   create  clear the fields  (ResetOnSuccess)
+   *   edit    keep them, confirm (Confirmation)
+   *   once    replace the form   (Done)
+   *
+   * A panel that expands to act counts as resolved if it closes
+   * (useCloseOnSuccess), and an action that navigates away resolves itself.
+   * A form of buttons only is resolved by the row it sits in changing.
+   */
+  const redirects = new Set<string>();
+  for (const f of walk(join(root, 'app', 'actions'))) {
+    const src = readFileSync(f, 'utf8');
+    const decls = Array.from(src.matchAll(/export async function (\w+)\(/g));
+    decls.forEach((m, i) => {
+      const from = m.index ?? 0;
+      const to = i + 1 < decls.length ? (decls[i + 1].index ?? src.length) : src.length;
+      if (src.slice(from, to).includes('redirect(')) redirects.add(m[1]);
+    });
+  }
+
+  const unresolved = clientFiles.filter((f: string) => {
+    const src = readFileSync(f, 'utf8');
+    if (!src.includes('useFormState') || !src.includes('<form action=')) return false;
+    // Confirmation is the right answer for an edit form: the values stay,
+    // because clearing them would look like the save had wiped everything.
+    if (/ResetOnSuccess|useCloseOnSuccess|<Done|<Confirmation/.test(src)) return false;
+
+    const used = Array.from(src.matchAll(/useFormState\((\w+)/g)).map((m: any) => m[1]);
+    if (used.length > 0 && used.every((a) => redirects.has(a))) return false;
+
+    const typed = /<(input|textarea)\b(?![^>]*type="hidden")/.test(src) || src.includes('<Field');
+    return typed;
+  }).map((f: string) => f.replace(root + '/', ''));
+
+  if (!unresolved.length) ok('every form resolves when it succeeds');
+  else bad(`these leave their fields filled: ${unresolved.join(', ')}`,
+           'Pick one: ResetOnSuccess to clear, Confirmation to keep, Done to replace.');
+
+  // The dashboard is the page members see most. If everything on it is a
+  // link out, it is a menu, not a dashboard.
+  const dash = read('app/portal/page.tsx') ?? '';
+  const inline = ['QuickRsvp', 'QuickPotluck', 'QuickArrival']
+    .filter((c) => dash.includes(c));
+  if (inline.length === 3) ok('members can act from the dashboard without navigating');
+  else bad(`dashboard is missing inline actions: ${['QuickRsvp','QuickPotluck','QuickArrival'].filter((c) => !dash.includes(c)).join(', ')}`);
+
+  // The pulse must never surface anything a member kept private.
+  const pulseSrc = read('lib/queries/pulse.ts') ?? '';
+  if (pulseSrc.includes('m.in_directory')) ok('activity feed respects directory opt-out');
+  else bad('activity feed may name members who opted out of the directory',
+           'The joined query must filter on m.in_directory.');
+  // Strip comments first — the file explains what it deliberately avoids,
+  // and matching prose would flag it for saying so.
+  const pulseCode = pulseSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
+  const pulseLeak = ['dues_charges', 'payments', 'adjustments', 'arrival_requests',
+                     'amount_cents', 'ballots']
+    .filter((t) => pulseCode.includes(t));
+  if (!pulseLeak.length) ok('activity feed shows nothing financial or private');
+  else bad(`activity feed touches ${pulseLeak.join(', ')}`);
+
+  const perms = read('lib/permissions.ts') ?? '';
+  if (perms.includes('PERMISSION_SETS')) ok('access derives from held office, not an account flag');
+  else bad('lib/permissions.ts is missing the permission sets');
 
   const mid = read('middleware.ts');
   if (mid && /from '@\/lib\/db'|postgres\(/.test(mid)) {
@@ -191,7 +407,9 @@ async function main() {
     const applied = (await sql<{ name: string }[]>`select name from _migrations order by name`)
       .map((m) => m.name);
     for (const m of ['001_init.sql', '002_arrival_semester.sql', '003_drop_program.sql',
-                     '004_money.sql', '005_drop_households.sql']) {
+                     '004_money.sql', '005_drop_households.sql',
+                     '006_payment_claims.sql', '007_elections.sql',
+                     '008_sessions.sql', '009_inbox.sql', '010_arrivals.sql', '011_audit_role.sql', '012_emails.sql', '013_sponsors.sql', '014_households_potluck.sql', '015_audit_scope.sql', '016_audit_diff.sql', '017_donor_student.sql', '018_appeals.sql']) {
       if (applied.includes(m)) ok(`migration ${m}`);
       else bad(`migration ${m} has not run`, 'npm run db:migrate');
     }
@@ -203,7 +421,11 @@ async function main() {
     const want = ['members','sessions','login_tokens','terms','officer_roles','posts','events',
       'contact_messages','audit_log','settings','dues_charges','payments',
       'adjustments','funds','donors','donations','ticket_orders','rsvps',
-      'status_change_requests','import_batches','ledger_entries'];
+      'status_change_requests','import_batches','ledger_entries',
+      'payment_claims','claim_tokens','elections','election_positions',
+      'nominations','election_voters','ballots','ballot_choices',
+      'arrival_requests','giveaway_items','housing_posts','job_posts',
+      'households','household_invites','potluck_items'];
     const absent = want.filter((t) => !tables.includes(t));
     if (!absent.length) ok(`all ${want.length} tables present`);
     else bad(`tables missing: ${absent.join(', ')}`, 'npm run db:migrate');
@@ -236,10 +458,15 @@ async function main() {
       else ok('dues assessed for this term');
     }
 
+    const [{ session }] = await sql<{ session: string }[]>`
+      select current_session as session from settings where id = 1`;
     const [{ n: officers }] = await sql<any[]>`
-      select count(*)::text n from officer_roles o join terms t on t.id=o.term_id where t.is_current`;
-    if (Number(officers) === 0) meh('no e-board for this term', '/eboard will show an empty state. Add them at /admin/eboard.');
-    else ok(`${officers} officers listed`);
+      select count(*)::text n from officer_roles
+      where session = ${session} and ended_at is null and is_eboard`;
+    console.log(`  ${dim('current session: ' + session)}`);
+    if (Number(officers) === 0) meh(`no e-board for ${session}`,
+      '/eboard will show an empty state. Assign offices at /admin/offices.');
+    else ok(`${officers} officers serving ${session}`);
 
     const [{ n: funds }] = await sql<any[]>`select count(*)::text n from funds`;
     if (Number(funds) >= 2) ok(`${funds} funds`);
@@ -281,6 +508,218 @@ async function main() {
       where le.source_type='donation' and d.is_in_kind`;
     if (Number(inKind[0].n) === 0) ok('in-kind gifts stay out of the cash ledger');
     else bad(`${inKind[0].n} in-kind gifts are counted as cash — funds look richer than they are`);
+
+    // A confirmed claim must have produced a payment, or money was
+    // acknowledged and never recorded.
+    const orphanClaims = await sql<any[]>`
+      select count(*)::text n from payment_claims
+      where status = 'confirmed' and payment_id is null`;
+    if (Number(orphanClaims[0].n) === 0) ok('every confirmed transfer created a payment');
+    else bad(`${orphanClaims[0].n} confirmed transfers produced no payment`);
+
+    // A pending claim must never have moved a balance.
+    const earlyPay = await sql<any[]>`
+      select count(*)::text n from payment_claims c
+      join payments p on p.id = c.payment_id
+      where c.status = 'pending'`;
+    if (Number(earlyPay[0].n) === 0) ok('pending transfers have not touched any balance');
+    else bad(`${earlyPay[0].n} pending transfers already created payments`);
+
+    // BALLOT SECRECY. If a ballot ever gains a column that narrows it to a
+    // person, the whole election design is void.
+    const ballotCols = await sql<{ column_name: string; table_name: string }[]>`
+      select table_name, column_name from information_schema.columns
+      where table_name in ('ballots','ballot_choices')`;
+    const leaky = ballotCols.filter((c) =>
+      /member|user|voter|created_by|ip$|agent|email|session/i.test(c.column_name));
+    if (!leaky.length) ok('ballots carry nothing that identifies a voter');
+    else bad(`ballots expose ${leaky.map((c) => c.table_name + '.' + c.column_name).join(', ')} — VOTES ARE NOT SECRET`,
+             'Drop that column. Who voted lives in election_voters; what was voted lives in ballots. They must never join.');
+
+    // Every ballot should correspond to someone marked as having voted.
+    const ballotMismatch = await sql<any[]>`
+      select e.id, e.name,
+        (select count(*) from ballots b where b.election_id = e.id)::int as ballots,
+        (select count(*) from election_voters v
+         where v.election_id = e.id and v.voted_at is not null)::int as voted
+      from elections e where e.status in ('voting','closed')`;
+    const off = ballotMismatch.filter((r: any) => r.ballots !== r.voted);
+    if (!off.length) ok('ballot count matches the number of members recorded as voting');
+    else bad(`mismatch in: ${off.map((r: any) => r.name).join(', ')}`);
+
+    // Nobody should be locked out of administering the site.
+    const [{ n: fullOffices }] = await sql<{ n: string }[]>`
+      select count(*)::text n from officer_roles
+      where ended_at is null and permission_set = 'full'`;
+    if (Number(fullOffices) >= 2) ok(`${fullOffices} offices hold full access`);
+    else if (Number(fullOffices) === 1) meh('only one office has full access',
+      'If that person loses access nobody can administer the site. President and General Secretary should both have it.');
+    else bad('no office has full access — nobody can administer the site',
+             'npm run db:admin -- your@email.com');
+
+    // Anyone holding an office should be able to use it.
+    const lockedOut = await sql<any[]>`
+      select m.full_name, o.title from members m
+      join officer_roles o on o.member_id = m.id and o.ended_at is null
+      where m.status <> 'active' and o.permission_set <> 'none'`;
+    if (!lockedOut.length) ok('every serving officer has an active membership');
+    else bad(`inactive members hold office: ${lockedOut.map((r: any) => r.full_name + ' (' + r.title + ')').join(', ')}`);
+
+    // Offices must be filed against a session, not a semester.
+    const [{ n: noSession }] = await sql<{ n: string }[]>`
+      select count(*)::text n from officer_roles where session is null`;
+    if (Number(noSession) === 0) ok('every office is filed against a session');
+    else bad(`${noSession} offices have no session`, 'npm run db:migrate');
+
+    // The volunteer board must never leak a surname, phone, flight, or email —
+    // an arrival request says where a stranger will be alone with luggage.
+    const board = read('lib/queries/community.ts') ?? '';
+    if (board.includes("split_part(a.full_name, ' ', 1)")) {
+      ok('arrival board shows first names only');
+    } else {
+      bad('arrival board may be exposing full names',
+          'arrivalBoard() must select split_part(full_name, \' \', 1), never the whole name.');
+    }
+    const leakFields = ['a.phone', 'a.flight_no', 'a.email'];
+    const boardFn = board.slice(board.indexOf('export async function arrivalBoard'),
+                                board.indexOf('export async function arrivalDetail'));
+    const leaked2 = leakFields.filter((f) => boardFn.includes(f));
+    if (!leaked2.length) ok('arrival board leaks no contact or flight details');
+    else bad(`arrival board selects ${leaked2.join(', ')} — visible to every member`);
+
+    // The log records the use of power. An officer RSVPing or linking their
+    // household is acting as a member — the office is incidental.
+    const [{ n: noise }] = await sql<{ n: string }[]>`
+      select count(*)::text n from audit_log
+      where action in ('auth.login','member.signup','household.invite','household.accept',
+                       'household.leave','arrival.claim','arrival.release','arrival.done',
+                       'rsvp.set','potluck.claim','giveaway.post','housing.post','job.post')`;
+    if (Number(noise) === 0) ok('audit log holds only admin actions');
+    else meh(`${noise} member-scope entries in the log`, 'npm run db:migrate applies the cleanup.');
+
+    const auditSrc = read('lib/audit.ts') ?? '';
+    if (auditSrc.includes('MEMBER_SCOPE')) ok('member-scope actions are filtered before writing');
+    else bad('lib/audit.ts writes every action',
+             'An officer using the member portal should not appear in the log.');
+
+    if (auditSrc.includes('NEVER_LOG') && auditSrc.includes('token_hash')) {
+      ok('token hashes are stripped before anything is logged');
+    } else if (!auditSrc) {
+      bad('lib/audit.ts is missing');
+    } else {
+      bad('the audit log may store token hashes',
+          'Anyone with log access could impersonate a member. Apply the audit-diff bundle.');
+    }
+
+    // A log that says "changed a status" without the old value answers nothing.
+    await check('audit diffs', async () => {
+      const [{ n: noDiff }] = await sql<{ n: string }[]>`
+        select count(*)::text n from audit_log
+        where operation = 'update' and (changed is null or jsonb_array_length(changed) = 0)`;
+      if (Number(noDiff) === 0) ok('every update in the log records what changed');
+      else bad(`${noDiff} update entries have no diff`,
+               'Use tracked() so the before and after are captured automatically.');
+
+      const [{ n: leaked }] = await sql<{ n: string }[]>`
+        select count(*)::text n from audit_log
+        where before_data::text ilike '%token_hash%' or after_data::text ilike '%token_hash%'`;
+      if (Number(leaked) === 0) ok('no stored diff contains a credential');
+      else bad(`${leaked} log entries contain a token hash`);
+    });
+
+    // Without the snapshot, "which president approved that?" is unanswerable
+    // once they hand over.
+    const [{ n: roleless }] = await sql<{ n: string }[]>`
+      select count(*)::text n from audit_log
+      where actor_id is not null and actor_role is null
+        and created_at > now() - interval '1 day'`;
+    if (Number(roleless) === 0) ok('audit entries record the office held at the time');
+    else bad(`${roleless} recent entries have no office recorded`,
+             'lib/audit.ts must snapshot the actor\'s office when it writes.');
+
+    // Students and alumni must be reachable after they leave.
+    const unreachable = await sql<any[]>`
+      select count(*)::text n from members
+      where member_type in ('student','alumni') and status = 'active'
+        and personal_email is null`;
+    if (Number(unreachable[0].n) === 0) ok('every student and alum has a personal address');
+    else meh(`${unreachable[0].n} students or alumni have no personal address`,
+      'They become unreachable when their UToledo account closes. Signup now requires one.');
+
+    const badDomain = await sql<any[]>`
+      select count(*)::text n from members
+      where university_email is not null and university_email not ilike '%utoledo.edu'`;
+    if (Number(badDomain[0].n) === 0) ok('every university address is a utoledo.edu one');
+    else bad(`${badDomain[0].n} university addresses are not utoledo.edu`);
+
+    // Nobody is named publicly without agreeing to it.
+    const [{ n: unconsented }] = await sql<{ n: string }[]>`
+      select count(*)::text n from donors
+      where show_publicly and is_anonymous`;
+    if (Number(unconsented) === 0) ok('no anonymous donor is shown publicly');
+    else bad(`${unconsented} anonymous donors are on the public page`,
+             'A donor who asked to stay anonymous must never be listed.');
+
+    // Households are for ATTENDANCE. If one ever leaks into dues, a couple
+    // gets charged once instead of twice.
+    const duesCols = await sql<{ table_name: string }[]>`
+      select table_name from information_schema.columns
+      where table_schema = 'public' and column_name = 'household_id'
+        and table_name in ('dues_charges','payments','adjustments')`;
+    if (!duesCols.length) ok('households do not touch dues');
+    else bad(`household_id found on ${duesCols.map((c) => c.table_name).join(', ')}`,
+             'Dues are per-student. A couple who both study owe twice.');
+
+    // Two answers from one household means a double-counted headcount.
+    const dupRsvp = await sql<any[]>`
+      select count(*)::text n from (
+        select event_id, household_id from rsvps
+        where household_id is not null
+        group by event_id, household_id having count(*) > 1
+      ) x`;
+    if (Number(dupRsvp[0].n) === 0) ok('one RSVP per household per event');
+    else bad(`${dupRsvp[0].n} households answered twice for the same event`);
+
+    // A dish claimed by two people is a dish nobody brings.
+    const dupClaim = await sql<any[]>`
+      select count(*)::text n from potluck_items
+      where claimed_by is not null and claimed_at is null`;
+    if (Number(dupClaim[0].n) === 0) ok('every claimed dish records when it was taken');
+    else bad(`${dupClaim[0].n} potluck items are claimed with no timestamp`);
+
+    // A dropdown that offers a value the database rejects fails only when
+    // somebody picks that one option — often long after launch.
+    const enumChecks: [string, string, string[]][] = [
+      ['donors', 'donors_type_check',
+        ['individual','student','alumni','faculty','university','business','organization']],
+      ['members', 'members_member_type_check',
+        ['student','alumni','faculty','spouse','community']],
+      ['officer_roles', 'officer_roles_permission_set_check',
+        ['full','money','members','content','events','none']],
+    ];
+
+    for (const [table, constraint, offered] of enumChecks) {
+      const [row] = await sql<{ def: string | null }[]>`
+        select pg_get_constraintdef(oid) as def from pg_constraint
+        where conname = ${constraint}`;
+      if (!row?.def) continue;
+      const missing = offered.filter((v) => !row.def!.includes(`'${v}'`));
+      if (!missing.length) ok(`${table}: every option the form offers is accepted`);
+      else bad(`${table} rejects ${missing.join(', ')}`,
+               `The form offers these but the check constraint refuses them — picking one errors.`);
+    }
+
+    // Someone turned down should still have a route back to a human.
+    const pendingSrc = read('app/auth/pending/page.tsx') ?? '';
+    if (pendingSrc.includes('Appeal')) ok('rejected members can ask to be reconsidered');
+    else bad('a rejected member has no way to reply',
+             'They can sign in and read the reason, but not respond to it.');
+
+    const soon = await sql<any[]>`
+      select count(*)::text n from arrival_requests
+      where status = 'open' and arriving_on between current_date and current_date + 7`;
+    if (Number(soon[0].n) > 0) meh(`${soon[0].n} arriving within a week with nobody assigned`,
+      'Someone landing at Detroit with no lift is what this feature exists to prevent. /admin/arrivals');
 
     const negFund = await sql<any[]>`
       select f.name, (coalesce((select sum(amount_cents) from donations d
@@ -333,4 +772,5 @@ async function main() {
   process.exit(fail ? 1 : 0);
 }
 
+// Even an unexpected failure should still print what was learned.
 main().catch(async (e) => { console.error(e); await sql.end(); process.exit(1); });

@@ -1,5 +1,7 @@
 import 'server-only';
 import { sql } from '@/lib/db';
+import { can } from '@/lib/permissions';
+import { audit, tracked, trackedCreate } from '@/lib/audit';
 import type { Member, DirectoryEntry, MemberStatus } from '@/lib/types';
 
 /**
@@ -18,9 +20,19 @@ import type { Member, DirectoryEntry, MemberStatus } from '@/lib/types';
  * ─────────────────────────────────────────────────────────────────────────
  */
 
+/**
+ * Any of a member's addresses signs them in. This is what makes graduation a
+ * non-event: when the university account dies they simply use the other one,
+ * and it is the same account with the same history.
+ */
 export async function findByEmail(email: string): Promise<Member | null> {
+  const e = email.trim().toLowerCase();
   const rows = await sql<Member[]>`
-    select * from members where lower(email) = lower(${email}) limit 1
+    select * from members
+    where lower(email) = ${e}
+       or lower(university_email) = ${e}
+       or lower(personal_email) = ${e}
+    limit 1
   `;
   return rows[0] ?? null;
 }
@@ -31,15 +43,54 @@ export async function findById(id: string): Promise<Member | null> {
 }
 
 export async function createPending(input: {
-  full_name: string; email: string; phone?: string | null; heard_from?: string | null;
+  full_name: string; member_type: string;
+  university_email?: string | null; personal_email?: string | null;
+  phone?: string | null; heard_from?: string | null;
 }): Promise<Member> {
+  // `email` is the address we send to, derived from type — students get the
+  // university one while it still works, everyone else the personal one.
+  const contact = input.member_type === 'student'
+    ? (input.university_email ?? input.personal_email)
+    : (input.personal_email ?? input.university_email);
+
+  if (!contact) throw new Error('An email address is required.');
+
   const rows = await sql<Member[]>`
-    insert into members (full_name, email, phone, heard_from)
-    values (${input.full_name}, ${input.email.toLowerCase()},
-            ${input.phone ?? null}, ${input.heard_from ?? null})
+    insert into members (full_name, email, university_email, personal_email,
+                         member_type, phone, heard_from)
+    values (${input.full_name}, ${contact.toLowerCase()},
+            ${input.university_email?.toLowerCase() ?? null},
+            ${input.personal_email?.toLowerCase() ?? null},
+            ${input.member_type}, ${input.phone ?? null}, ${input.heard_from ?? null})
     returning *
   `;
   return rows[0];
+}
+
+/** An admin editing somebody else's record — always logged with the diff. */
+export async function adminUpdateMember(
+  actor: Member, id: string, fields: Record<string, string | number | null>
+) {
+  await assertAdmin(actor);
+  await tracked(actor.id, 'members', id, 'member.edit', async () => {
+    const entries = Object.entries(fields);
+    if (!entries.length) return;
+    await sql`update members set ${sql(fields as any, ...Object.keys(fields))} where id = ${id}`;
+  });
+}
+
+/** Keep the send-to address in step with the member's type. Called whenever
+ *  a type changes, so graduation needs no separate migration. */
+export async function refreshContactEmail(memberId: string) {
+  await sql`
+    update members
+    set email = case
+      when member_type = 'student'
+        then coalesce(university_email, personal_email, email)
+      else coalesce(personal_email, university_email, email)
+    end
+    where id = ${memberId}
+  `;
 }
 
 export async function markEmailVerified(id: string) {
@@ -54,6 +105,7 @@ export async function touchLastSeen(id: string) {
  *  role, status, email, approved_at. Those are not in this list on purpose. */
 export type SelfEditable = {
   full_name: string;
+  personal_email: string | null;
   phone: string | null;
   member_type: string;
   student_level: string | null;
@@ -71,6 +123,7 @@ export async function updateSelf(id: string, p: SelfEditable) {
   await sql`
     update members set
       full_name = ${p.full_name},
+      personal_email = ${p.personal_email},
       phone = ${p.phone},
       member_type = ${p.member_type},
       student_level = ${p.student_level},
@@ -120,8 +173,7 @@ export async function directory(actor: Member, q = ''): Promise<DirectoryEntry[]
   const term = `%${q.trim()}%`;
   return sql<DirectoryEntry[]>`
     select
-      id, full_name, member_type, student_level,
-      arrival_semester, arrival_year,
+      id, full_name, member_type, student_level, arrival_semester, arrival_year,
       case when show_photo      then photo_url   end as photo_url,
       case when show_email      then email       end as email,
       case when show_phone      then phone       end as phone,
@@ -142,19 +194,24 @@ export async function directory(actor: Member, q = ''): Promise<DirectoryEntry[]
 // the pages already sit behind requireAdmin(), but a server action is a
 // public HTTP endpoint and must never trust its caller.
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') {
-    throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'members'))) {
+    throw new Error('You do not have access to this.');
   }
 }
 
 export async function listPending(actor: Member): Promise<Member[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<Member[]>`select * from members where status = 'pending' order by created_at`;
 }
 
 export async function listAll(actor: Member, opts: { status?: string; q?: string } = {}) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const term = `%${(opts.q ?? '').trim()}%`;
   const hasQ = (opts.q ?? '').trim() !== '';
   return sql<Member[]>`
@@ -166,7 +223,7 @@ export async function listAll(actor: Member, opts: { status?: string; q?: string
 }
 
 export async function statusCounts(actor: Member) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const rows = await sql<{ status: MemberStatus; n: string }[]>`
     select status, count(*)::text as n from members group by status
   `;
@@ -174,35 +231,40 @@ export async function statusCounts(actor: Member) {
 }
 
 export async function approve(actor: Member, id: string) {
-  assertAdmin(actor);
-  const rows = await sql<Member[]>`
-    update members
-    set status = 'active', approved_at = now(), approved_by = ${actor.id}, rejected_reason = null
-    where id = ${id} and status = 'pending'
-    returning *
-  `;
-  return rows[0] ?? null;
+  await assertAdmin(actor);
+  let approved: Member | undefined;
+
+  await tracked(actor.id, 'members', id, 'member.approve', async () => {
+    const rows = await sql<Member[]>`
+      update members
+      set status = 'active', approved_at = now(), approved_by = ${actor.id},
+          rejected_reason = null
+      where id = ${id} and status = 'pending'
+      returning *
+    `;
+    approved = rows[0];
+  });
+
+  return approved ?? null;
 }
 
 export async function reject(actor: Member, id: string, reason: string) {
-  assertAdmin(actor);
-  await sql`update members set status = 'rejected', rejected_reason = ${reason} where id = ${id}`;
+  await assertAdmin(actor);
+  await tracked(actor.id, 'members', id, 'member.reject', async () => {
+    await sql`update members set status = 'rejected', rejected_reason = ${reason} where id = ${id}`;
+  }, { reason });
 }
 
 export async function setStatus(actor: Member, id: string, status: MemberStatus) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   // Guard against the last admin locking everyone out of the admin area.
   if (id === actor.id && status !== 'active') throw new Error('You cannot deactivate yourself.');
-  await sql`update members set status = ${status} where id = ${id}`;
+  await tracked(actor.id, 'members', id, 'member.status', async () => {
+    await sql`update members set status = ${status} where id = ${id}`;
+  });
 }
 
-export async function setRole(actor: Member, id: string, role: 'member' | 'admin') {
-  assertAdmin(actor);
-  if (id === actor.id && role !== 'admin') {
-    const [{ n }] = await sql<{ n: string }[]>`
-      select count(*)::text as n from members where role = 'admin' and status = 'active'
-    `;
-    if (Number(n) <= 1) throw new Error('You are the only admin. Promote someone else first.');
-  }
-  await sql`update members set role = ${role} where id = ${id}`;
-}
+/**
+ * Removed. A member's access comes from the office they hold, assigned at
+ * /admin/offices — never from a flag toggled on their account.
+ */

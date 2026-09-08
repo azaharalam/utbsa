@@ -1,6 +1,7 @@
 import 'server-only';
 import { sql } from '@/lib/db';
-import { audit } from '@/lib/audit';
+import { audit, trackedCreate, trackedDelete, tracked } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
 import type { MemberBalance, DuesLine, PaymentMethod, AdjustmentKind } from '@/lib/money';
 
@@ -19,8 +20,15 @@ import type { MemberBalance, DuesLine, PaymentMethod, AdjustmentKind } from '@/l
  * ─────────────────────────────────────────────────────────────
  */
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'money'))) {
+    throw new Error('You do not have access to this.');
+  }
 }
 
 // ───────────────────────── reading ─────────────────────────
@@ -67,7 +75,7 @@ export async function balances(
   actor: Member,
   opts: { onlyOwing?: boolean } = {}
 ): Promise<MemberBalance[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
 
   const rows = await sql<any[]>`
     select
@@ -117,7 +125,7 @@ export async function findOrCreateTerm(season: string, year: number): Promise<st
 }
 
 export async function assessmentPreview(actor: Member, termId: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const [row] = await sql<any[]>`
     select
       (select count(*)::text from members
@@ -142,8 +150,15 @@ export async function assessmentPreview(actor: Member, termId: string) {
  * 2026. `dues_assessed_at` makes this a one-time act, so a double click
  * cannot double-charge everyone.
  */
+/** Preview for a semester and year, creating the term if it does not exist. */
+export async function previewFor(actor: Member, season: string, year: number) {
+  await assertAdmin(actor);
+  const termId = await findOrCreateTerm(season, year);
+  return { ...(await assessmentPreview(actor, termId)), term_id: termId };
+}
+
 export async function assessTerm(actor: Member, termId: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
 
   const [term] = await sql<any[]>`
     select dues_cents, dues_assessed_at::text, name from terms where id = ${termId}
@@ -160,18 +175,18 @@ export async function assessTerm(actor: Member, termId: string) {
     returning id
   `;
 
-  await sql`update terms set dues_assessed_at = now() where id = ${termId}`;
-  await audit(actor.id, 'dues.assess', 'term', termId, {
-    charges: inserted.length, amount_cents: term.dues_cents,
-  });
+  await tracked(actor.id, 'terms', termId, 'dues.assess', async () => {
+    await sql`update terms set dues_assessed_at = now() where id = ${termId}`;
+  }, { charges: inserted.length, amount_cents: term.dues_cents });
 
   return inserted.length;
 }
 
 export async function setTermDues(actor: Member, termId: string, cents: number) {
-  assertAdmin(actor);
-  await sql`update terms set dues_cents = ${cents} where id = ${termId}`;
-  await audit(actor.id, 'dues.set_rate', 'term', termId, { amount_cents: cents });
+  await assertAdmin(actor);
+  await tracked(actor.id, 'terms', termId, 'dues.set_rate', async () => {
+    await sql`update terms set dues_cents = ${cents} where id = ${termId}`;
+  });
 }
 
 // ───────────────────────── writing ─────────────────────────
@@ -186,7 +201,7 @@ export async function recordPayment(
     note?: string | null; externalRef?: string | null; rowHash?: string | null;
   }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   if (p.amountCents <= 0) throw new Error('Amount must be more than zero.');
   if (p.method === 'fund' && !p.fundId) throw new Error('Pick a fund to pay from.');
 
@@ -227,9 +242,8 @@ export async function recordPayment(
     return row.id;
   });
 
-  await audit(actor.id, 'payment.record', 'member', p.memberId, {
-    amount_cents: p.amountCents, method: p.method,
-  });
+  await trackedCreate(actor.id, 'payments', id, 'payment.record',
+    { member_id: p.memberId });
 
   return id;
 }
@@ -242,7 +256,7 @@ export async function addAdjustment(
     reason: string; termId?: string | null;
   }
 ) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   if (!a.reason.trim()) throw new Error('A reason is required.');
 
   const [row] = await sql<{ id: string }[]>`
@@ -252,9 +266,8 @@ export async function addAdjustment(
     returning id
   `;
 
-  await audit(actor.id, `dues.${a.kind}`, 'member', a.memberId, {
-    amount_cents: a.amountCents, reason: a.reason.trim(),
-  });
+  await trackedCreate(actor.id, 'adjustments', row.id, `dues.${a.kind}`,
+    { member_id: a.memberId });
 
   return row.id;
 }

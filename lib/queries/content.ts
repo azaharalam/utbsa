@@ -1,9 +1,18 @@
 import 'server-only';
 import { sql } from '@/lib/db';
+import { tracked, trackedCreate, trackedDelete } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import type { Member, Post, EventRow, Term, Officer } from '@/lib/types';
 
-function assertAdmin(actor: Member) {
-  if (actor.role !== 'admin' || actor.status !== 'active') throw new Error('Admins only.');
+/**
+ * Access comes from the office someone holds, never from a flag on their
+ * account. The page guard already checked this, but a server action is a
+ * public HTTP endpoint — it must never trust its caller.
+ */
+async function assertAdmin(actor: Member) {
+  if (actor.status !== 'active' || !(await can(actor.id, 'content'))) {
+    throw new Error('You do not have access to this.');
+  }
 }
 
 // ───────────────────────── terms ─────────────────────────
@@ -34,12 +43,12 @@ export async function postBySlug(slug: string): Promise<Post | null> {
 }
 
 export async function allPosts(actor: Member): Promise<Post[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<Post[]>`select * from posts order by created_at desc`;
 }
 
 export async function postById(actor: Member, id: string): Promise<Post | null> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const rows = await sql<Post[]>`select * from posts where id = ${id} limit 1`;
   return rows[0] ?? null;
 }
@@ -50,19 +59,22 @@ export type PostInput = {
 };
 
 export async function savePost(actor: Member, p: PostInput) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const status = p.publish ? 'published' : 'draft';
   const publishedAt = p.publish ? new Date() : null;
 
   if (p.id) {
-    await sql`
-      update posts set
-        slug = ${p.slug}, title = ${p.title}, excerpt = ${p.excerpt},
-        body = ${p.body}, category = ${p.category}, status = ${status},
-        published_at = coalesce(published_at, ${publishedAt})
-      where id = ${p.id}
-    `;
-    return p.id;
+    const pid = p.id;
+    await tracked(actor.id, 'posts', pid, 'post.update', async () => {
+      await sql`
+        update posts set
+          slug = ${p.slug}, title = ${p.title}, excerpt = ${p.excerpt},
+          body = ${p.body}, category = ${p.category}, status = ${status},
+          published_at = coalesce(published_at, ${publishedAt})
+        where id = ${pid}
+      `;
+    });
+    return pid;
   }
 
   const rows = await sql<{ id: string }[]>`
@@ -71,12 +83,15 @@ export async function savePost(actor: Member, p: PostInput) {
             ${status}, ${publishedAt}, ${actor.id})
     returning id
   `;
+  await trackedCreate(actor.id, 'posts', rows[0].id, 'post.create');
   return rows[0].id;
 }
 
 export async function deletePost(actor: Member, id: string) {
-  assertAdmin(actor);
-  await sql`delete from posts where id = ${id}`;
+  await assertAdmin(actor);
+  await trackedDelete(actor.id, 'posts', id, 'post.delete', async () => {
+    await sql`delete from posts where id = ${id}`;
+  });
 }
 
 // ───────────────────────── events ─────────────────────────
@@ -113,7 +128,7 @@ export async function eventBySlug(viewer: Member | null, slug: string): Promise<
 }
 
 export async function allEvents(actor: Member): Promise<EventRow[]> {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   return sql<EventRow[]>`select * from events order by starts_at desc`;
 }
 
@@ -121,56 +136,67 @@ export type EventInput = {
   id?: string; slug: string; title: string; bengali_title: string | null;
   description: string | null; starts_at: Date; ends_at: Date | null;
   location_name: string | null; location_addr: string | null; is_public: boolean;
+  isPotluck?: boolean;
 };
 
 export async function saveEvent(actor: Member, e: EventInput) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const term = await currentTerm();
 
   if (e.id) {
+    const eid = e.id;
+    await tracked(actor.id, 'events', eid, 'event.update', async () => {
     await sql`
       update events set
         slug = ${e.slug}, title = ${e.title}, bengali_title = ${e.bengali_title},
         description = ${e.description}, starts_at = ${e.starts_at}, ends_at = ${e.ends_at},
         location_name = ${e.location_name}, location_addr = ${e.location_addr},
-        is_public = ${e.is_public}
-      where id = ${e.id}
+        is_public = ${e.is_public}, is_potluck = ${e.isPotluck ?? false}
+      where id = ${eid}
     `;
-    return e.id;
+    });
+    return eid;
   }
 
   const rows = await sql<{ id: string }[]>`
     insert into events (slug, title, bengali_title, description, starts_at, ends_at,
-                        location_name, location_addr, is_public, term_id)
+                        location_name, location_addr, is_public, is_potluck, term_id)
     values (${e.slug}, ${e.title}, ${e.bengali_title}, ${e.description},
             ${e.starts_at}, ${e.ends_at}, ${e.location_name}, ${e.location_addr},
-            ${e.is_public}, ${term?.id ?? null})
+            ${e.is_public}, ${e.isPotluck ?? false}, ${term?.id ?? null})
     returning id
   `;
+  await trackedCreate(actor.id, 'events', rows[0].id, 'event.create');
   return rows[0].id;
 }
 
 export async function deleteEvent(actor: Member, id: string) {
-  assertAdmin(actor);
-  await sql`delete from events where id = ${id}`;
+  await assertAdmin(actor);
+  await trackedDelete(actor.id, 'events', id, 'event.delete', async () => {
+    await sql`delete from events where id = ${id}`;
+  });
 }
 
 // ───────────────────────── e-board ─────────────────────────
-export async function officers(termId?: string): Promise<Officer[]> {
-  const term = termId ?? (await currentTerm())?.id;
-  if (!term) return [];
+/** The board serving right now. Sessions, not semesters. */
+export async function officers(session?: string): Promise<Officer[]> {
+  const s = session ?? (await sql<{ current_session: string }[]>`
+    select current_session from settings where id = 1
+  `)[0]?.current_session;
+  if (!s) return [];
+
   return sql<Officer[]>`
-    select o.id, o.title, o.sort_order, m.id as member_id, m.full_name,
+    select o.id, o.title, o.sort_order, o.session, m.id as member_id, m.full_name,
            m.photo_url, m.department, m.email
     from officer_roles o
     join members m on m.id = o.member_id
-    where o.term_id = ${term} and o.is_eboard
+    where o.session = ${s} and o.is_eboard and o.ended_at is null
     order by o.sort_order, o.title
   `;
 }
 
 export async function addOfficer(actor: Member, memberId: string, title: string, sortOrder: number) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const term = await currentTerm();
   if (!term) throw new Error('No current term is set.');
   await sql`
@@ -181,7 +207,7 @@ export async function addOfficer(actor: Member, memberId: string, title: string,
 }
 
 export async function removeOfficer(actor: Member, id: string) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   await sql`delete from officer_roles where id = ${id}`;
 }
 
@@ -194,7 +220,7 @@ export async function saveMessage(m: { name: string; email: string; subject: str
 }
 
 export async function unhandledMessageCount(actor: Member) {
-  assertAdmin(actor);
+  await assertAdmin(actor);
   const [{ n }] = await sql<{ n: string }[]>`
     select count(*)::text as n from contact_messages where not handled
   `;

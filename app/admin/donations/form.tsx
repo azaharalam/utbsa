@@ -5,16 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { recordDonation } from '@/app/actions/money';
 import { Card, Notice, Field, Toggle } from '@/components/ui';
 import { Submit } from '@/components/money/forms';
-
-function Clear({ ok, formRef, reset }: {
-  ok?: string; formRef: React.RefObject<HTMLFormElement>; reset: () => void;
-}) {
-  const { pending } = useFormStatus();
-  useEffect(() => {
-    if (ok && !pending) { formRef.current?.reset(); reset(); }
-  }, [ok, pending, formRef, reset]);
-  return null;
-}
+import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
 
 export default function DonationForm() {
   const [state, action] = useFormState(recordDonation, {});
@@ -31,10 +22,10 @@ export default function DonationForm() {
       </p>
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      <Confirmation message={state.ok} />
 
       <form action={action} ref={formRef}>
-        <Clear ok={state.ok} formRef={formRef} reset={() => setInKind(false)} />
+        <ResetOnSuccess ok={state.ok} formRef={formRef} also={() => setInKind(false)} />
 
         <Field label="Who gave it" name="donor_name" required placeholder="Dr. Mizanur Zaman" />
 

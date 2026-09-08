@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { sql } from '@/lib/db';
 import { balances, assessmentPreview } from '@/lib/queries/dues';
 import { funds } from '@/lib/queries/donations';
@@ -12,10 +12,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dues' };
 
 export default async function DuesAdmin() {
-  const me = await requireAdmin();
+  const me = await requirePermission('money');
 
-  const terms = await sql<any[]>`select * from terms order by year desc, season`;
-  const current = terms.find((t) => t.is_current) ?? terms[0];
+  const [current] = await sql<any[]>`select * from terms where is_current limit 1`;
 
   const [preview, rows, fundList] = await Promise.all([
     current ? assessmentPreview(me, current.id) : Promise.resolve(null),
@@ -55,10 +54,10 @@ export default async function DuesAdmin() {
 
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         {current && preview && (
-          <AssessPanel
-            terms={terms.map((t) => ({ id: t.id, name: t.name, dues_cents: t.dues_cents }))}
-            current={{ ...preview, term_id: current.id }}
-          />
+          <AssessPanel current={{
+            ...preview, term_id: current.id,
+            season: current.season, year: current.year,
+          }} />
         )}
         <PaymentForm members={memberOpts} funds={fundOpts} />
       </div>

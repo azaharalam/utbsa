@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireMember } from '@/lib/session';
 import { Card } from '@/components/ui';
 import SignOutButton from '@/components/sign-out';
+import Appeal from './appeal';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Waiting for approval' };
@@ -15,11 +16,30 @@ export default async function Pending() {
     return (
       <Card>
         <h1 className="mb-2 font-display text-2xl font-bold">Your request was not approved</h1>
-        <p className="mb-4 text-sm text-ink-mid">{me.rejected_reason}</p>
+        {me.rejected_reason && (
+          <div className="mb-4 rounded-lg border-2 border-dashed border-stitch bg-muslin p-3">
+            <p className="text-xs font-semibold text-ink-mid">The reason given</p>
+            <p className="text-sm">{me.rejected_reason}</p>
+          </div>
+        )}
+
         <p className="mb-4 text-sm text-ink-mid">
-          If you think this is a mistake, <Link href="/contact" className="font-semibold text-kantha">get in touch</Link>{' '}
-          and we will take another look.
+          Your account still exists and you can sign in with this address whenever you
+          like — nothing has been deleted. If you think a mistake was made, or
+          something has changed, tell us and somebody will look at it again.
         </p>
+
+        <div className="mb-4">
+          <Appeal />
+        </div>
+
+        <p className="mb-4 text-xs text-ink-mid">
+          You can also{' '}
+          <Link href="/contact" className="font-semibold text-kantha">use the contact form</Link>,
+          or email the e-board directly. UTBSA events that are open to the public are
+          still open to you.
+        </p>
+
         <SignOutButton />
       </Card>
     );

@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { listPending } from '@/lib/queries/members';
 import { Empty } from '@/components/ui';
 import ApprovalRow from './row';
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Approvals' };
 
 export default async function Approvals() {
-  const me = await requireAdmin();
+  const me = await requirePermission('members');
   const pending = await listPending(me);
 
   return (

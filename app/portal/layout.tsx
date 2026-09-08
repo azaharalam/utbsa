@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireApproved } from '@/lib/session';
+import { hasAnyAdminAccess } from '@/lib/permissions';
 import PortalNav from '@/components/portal-nav';
 import SignOutButton from '@/components/sign-out';
 import { Avatar } from '@/components/ui';
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const me = await requireApproved();
+  const isOfficer = await hasAnyAdminAccess(me.id);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -26,7 +28,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </Link>
           <Link href="/" className="hidden text-sm text-ink-mid hover:text-nil sm:block">Public site</Link>
           <div className="ml-auto flex items-center gap-3">
-            {me.role === 'admin' && (
+            {isOfficer && (
               <Link href="/admin" className="rounded-lg bg-nil px-3 py-1.5 text-xs font-semibold text-white">
                 Admin
               </Link>
@@ -41,7 +43,13 @@ export default async function PortalLayout({ children }: { children: React.React
         <PortalNav
           items={[
             { href: '/portal', label: 'Dashboard' },
+            { href: '/portal/events', label: 'Events' },
             { href: '/portal/dues', label: 'My dues' },
+            { href: '/portal/election', label: 'Election' },
+            { href: '/portal/arrivals', label: 'Arrivals' },
+            { href: '/portal/giveaway', label: 'Giveaway' },
+            { href: '/portal/housing', label: 'Housing' },
+            { href: '/portal/jobs', label: 'Jobs' },
             { href: '/portal/profile', label: 'My profile' },
             { href: '/portal/directory', label: 'Directory' },
           ]}

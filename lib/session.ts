@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { randomToken, hashToken } from '@/lib/crypto';
 import type { Member } from '@/lib/types';
+import { can, hasAnyAdminAccess, permissionsFor, type Permission } from '@/lib/permissions';
 
 const COOKIE = 'utbsa_session';
 const DAYS = 30;
@@ -84,13 +85,33 @@ export async function requireApproved(): Promise<Member> {
 }
 
 /**
- * An admin. This is the only place the check lives — never re-derive it from a
- * form field, a query parameter, or anything else the browser controls.
+ * Anyone with a reason to be in the admin area at all.
+ *
+ * Individual pages then narrow this with requirePermission(), because a
+ * Treasurer belongs in /admin/dues but not /admin/approvals.
  */
 export async function requireAdmin(): Promise<Member> {
   const member = await requireApproved();
-  if (member.role !== 'admin') redirect('/portal');
+  if (!(await hasAnyAdminAccess(member.id))) redirect('/portal');
   return member;
+}
+
+/**
+ * Access follows from the office someone holds, never from a flag on their
+ * account. Never re-derive this from a form field, a query parameter, or
+ * anything else the browser controls.
+ */
+export async function requirePermission(permission: Permission): Promise<Member> {
+  const member = await requireApproved();
+  if (!(await can(member.id, permission))) redirect('/admin');
+  return member;
+}
+
+/** For branching inside a page rather than blocking entry to it. */
+export async function currentPermissions(): Promise<Permission[]> {
+  const member = await getCurrentMember();
+  if (!member) return [];
+  return permissionsFor(member.id);
 }
 
 /** Housekeeping. Call from a cron job, or just occasionally. */

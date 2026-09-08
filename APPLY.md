@@ -1,93 +1,52 @@
-# Round-2 fixes
+# The missing bundle — apply this one last
 
-**22 files. One new migration. One page deleted.**
+Every one of your four failures comes from this bundle not being on disk.
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-git add -A && git commit -m "before round-2 fixes"
+cp -r ~/Downloads/utbsa-misc2/. .
 
-cp -r ~/Downloads/utbsa-fixes/. .
-rm -rf app/admin/dues/reconcile        # merged into /admin/dues
-
-npm run db:migrate                     # applies 005_drop_households.sql
-npx tsc --noEmit                       # should be silent
-npm run doctor                         # 38 passed
-npm run db:demo                        # reload demo data for the new schema
+ls lib/calendar.ts components/money/add-to-calendar.tsx      # both should exist
+npm run db:migrate                                            # runs 018
+rm -rf .next
+npm run doctor                                                # 96 passed
 npm run dev
 ```
 
-If anything looks wrong: `git checkout .` puts every file back. The migration
-stays applied; `npm run db:reset && npm run db:migrate && npm run db:seed` undoes that too.
+It ships the newest version of every file it touches, so applying it after the
+others cannot undo anything.
 
 ---
 
-## What changed
+## What it contains
 
-**Households are gone.** Charges, payments, and adjustments now point straight at
-a member. Only students are ever charged, so the household layer bought nothing —
-it just put an indirection between a charge and the person who owed it. Migration
-005 moves existing payments onto the right member and drops the table.
+| Failure | Fixed by |
+|---|---|
+| `lib/calendar.ts` missing | the calendar helpers |
+| `app/events/[slug]/calendar/route.ts` missing | the `.ics` download route |
+| migration `018_appeals.sql` has not run | the migration |
+| a rejected member has no way to reply | the appeal form |
 
-Farhana and Sabbir, both students, now show $30 each rather than $60 as one row.
+Plus **Requests → Status changes** in the admin nav, which you already have.
 
-**/admin/dues/reconcile is deleted.** Its actions moved inline into the dues table.
-Anyone with a non-zero balance gets an Action button — waive, adjust, or cover from
-a fund. Bulk reminders sit above the table.
+## The three features
 
-**Record payment** takes Semester and Year as two dropdowns instead of one term
-picker. Year runs current ±5, eleven options. If that term does not exist yet it is
-created automatically, so the treasurer never has to set one up first.
+**Add to calendar** on the RSVP box once someone says yes, and on the event
+page for anyone signed out. Three routes, because Google and Outlook take a URL
+while Apple Calendar wants a downloaded file — offering one strands half your
+members.
 
-**Member cards** now read:
+**A rejected member can reply.** They could already sign in and read the
+reason; now there is *"Ask us to look again"*, which lands in `/admin/messages`
+attached to their account, so whoever reads it has the record rather than a
+name typed into a public form. One open appeal at a time.
 
-```
-Rafid Hossain (admin)
-rafid@example.org | +1 419 555 0142
-Student · PhD in Chemical Engineering · Joined Fall 2025
-```
+**Status changes** rather than Requests, which is what the tab holds.
 
-Phone only appears if that member allowed it.
+## After this
 
-**The role dropdown is gone from /admin/members.** Admin rights follow from the
-election result, not a manual toggle. Until Phase 3, create an admin with
-`npm run db:admin -- email@example.com`.
+Two notes will remain, both correct:
 
-**Donation form** clears after saving, and is shorter: donor email and the fund
-picker are gone. Gifts land in General; move one into a restricted fund from the
-dropdown on its row in the list. `student` added to donor types.
-
-**Expense categories** are now a fixed list — Food and catering, Venue and equipment
-rental, Decorations and supplies, Sports and recreation, Printing and promotion, and
-Other. Picking Other requires a real note, not two words.
-
-**Bengali title removed** from the event form.
-
----
-
-## Funds and donations — the difference
-
-They answer two different questions.
-
-**A donation is one gift.** Who gave, how much, when. One row per gift.
-
-**A fund is a pot the money sits in** — a label saying what it may be spent on. Its
-balance is never typed in, which is why there was no amount field. It is calculated:
-donations into that fund, minus spending out of it. Typing a starting number would
-be inventing money.
-
-You need funds only when money arrives with strings attached. A $500 grant from the
-Office of Student Involvement **for Boishakh** is not available for a cricket
-tournament, and keeping it separate is what stops it quietly being spent elsewhere.
-
-Your model of "funds = grants from UT organizations" was right — those are donations
-with donor type `university`, paid into a restricted fund. Same thing, two directions.
-
-Both pages now say this on screen.
-
-**How donations get created:** the form on `/admin/donations`. There is no public
-donation form, which matches your plan — the contact page tells people to get in
-touch, and you record the gift by hand once the money arrives.
-
-**The "which fund" dropdown** on the expense form is just the rows in the `funds`
-table: General and Dues Assistance ship with the migration, Boishakh 1434 comes
-from the demo seed.
+- **1 student or alum has no personal address** — your own account, made before
+  the two-address rule. Add one at `/portal/profile`.
+- **email prints to the terminal** — waiting on the UTBSA account.

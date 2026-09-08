@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { updateProfile, updateVisibility } from '@/app/actions/profile';
 import { Card, Field, Button, Toggle, Notice, Avatar } from '@/components/ui';
+import { Confirmation } from '@/components/money/form-result';
 import GraduateBox from '@/components/money/graduate';
+import HouseholdBox from '@/components/money/household';
+import type { HouseholdMember, HouseholdInvite } from '@/lib/queries/households';
 import type { Member } from '@/lib/types';
 
 function Save({ label = 'Save changes' }: { label?: string }) {
@@ -51,10 +54,15 @@ function PhotoUpload({ member }: { member: Member }) {
   );
 }
 
-// Next year first, then back far enough to cover a long PhD.
-const YEARS = Array.from({ length: 12 }, (_, i) => String(new Date().getFullYear() + 1 - i));
-
-export default function ProfileForm({ member }: { member: Member }) {
+export default function ProfileForm({
+  member, household, incoming, outgoing, members,
+}: {
+  member: Member;
+  household: HouseholdMember[];
+  incoming: HouseholdInvite[];
+  outgoing: HouseholdInvite[];
+  members: { id: string; name: string }[];
+}) {
   const [pState, pAction] = useFormState(updateProfile, {});
   const [vState, vAction] = useFormState(updateVisibility, {});
 
@@ -65,12 +73,28 @@ export default function ProfileForm({ member }: { member: Member }) {
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <Card>
           {pState.error && <Notice tone="error">{pState.error}</Notice>}
-          {pState.ok && <Notice tone="success">{pState.ok}</Notice>}
+          <Confirmation message={pState.ok} />
 
           <PhotoUpload member={member} />
 
           <form action={pAction}>
             <Field label="Full name" name="full_name" defaultValue={member.full_name} required />
+            {member.university_email && (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-semibold text-ink-mid">
+                  UToledo email
+                </label>
+                <div className="rounded-lg border border-[#D6D1C2] bg-muslin-deep px-3 py-2.5 text-sm text-ink-mid">
+                  {member.university_email}
+                </div>
+                <p className="mt-1 text-xs text-ink-mid">
+                  Fixed — it is how we confirm you are at UToledo. Ask an admin if it is wrong.
+                </p>
+              </div>
+            )}
+            <Field label="Personal email" name="personal_email" type="email"
+              defaultValue={member.personal_email}
+              hint="Signs you in just like your UToledo address, and keeps working after you graduate." />
             <Field label="Phone" name="phone" type="tel" defaultValue={member.phone} />
 
             <div className="grid gap-x-4 sm:grid-cols-2">
@@ -98,24 +122,11 @@ export default function ProfileForm({ member }: { member: Member }) {
                 label="District in Bangladesh" name="hometown_bd" defaultValue={member.hometown_bd}
                 placeholder="Sylhet" hint="Shown in the directory so people from home can find you."
               />
-            </div>
-
-            <p className="mb-1.5 text-xs font-bold text-ink-mid">Arrived in Toledo</p>
-            <div className="grid gap-x-4 sm:grid-cols-2">
-              <Field
-                label="Semester" name="arrival_semester" as="select"
-                defaultValue={member.arrival_semester}
-                options={[
-                  { value: 'spring', label: 'Spring' },
-                  { value: 'summer', label: 'Summer' },
-                  { value: 'fall', label: 'Fall' },
-                ]}
-              />
-              <Field
-                label="Year" name="arrival_year" as="select"
+              <Field label="Arrived — semester" name="arrival_semester" as="select" defaultValue={member.arrival_semester}
+                options={[{ value: 'spring', label: 'Spring' }, { value: 'summer', label: 'Summer' }, { value: 'fall', label: 'Fall' }]} />
+              <Field label="Arrived — year" name="arrival_year" as="select"
                 defaultValue={member.arrival_year ? String(member.arrival_year) : null}
-                options={YEARS.map((y) => ({ value: y, label: y }))}
-              />
+                options={Array.from({ length: 12 }, (_, i) => String(new Date().getFullYear() + 1 - i)).map((y) => ({ value: y, label: y }))} />
             </div>
 
             <Field label="LinkedIn" name="linkedin_url" defaultValue={member.linkedin_url} placeholder="Optional" />
@@ -132,8 +143,6 @@ export default function ProfileForm({ member }: { member: Member }) {
 
             <Save />
           </form>
-
-          <GraduateBox memberType={member.member_type} />
         </Card>
 
         <Card>
@@ -142,7 +151,7 @@ export default function ProfileForm({ member }: { member: Member }) {
             Nothing here is ever public. These control what other signed-in members see.
           </p>
           {vState.error && <Notice tone="error">{vState.error}</Notice>}
-          {vState.ok && <Notice tone="success">{vState.ok}</Notice>}
+          <Confirmation message={vState.ok} />
 
           <form action={vAction}>
             <Toggle label="Show my email" name="show_email" defaultChecked={member.show_email} />
@@ -153,6 +162,11 @@ export default function ProfileForm({ member }: { member: Member }) {
             <Toggle label="List me in the directory" name="in_directory" defaultChecked={member.in_directory} />
             <div className="mt-4"><Save label="Save privacy settings" /></div>
           </form>
+
+          <HouseholdBox meId={member.id} household={household}
+            incoming={incoming} outgoing={outgoing} members={members} />
+
+          <GraduateBox memberType={member.member_type} />
         </Card>
       </div>
     </>

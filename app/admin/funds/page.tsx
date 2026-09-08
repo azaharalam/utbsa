@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { funds } from '@/lib/queries/donations';
 import { Card, Pill } from '@/components/ui';
 import { Money } from '@/components/money/forms';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Funds' };
 
 export default async function Funds() {
-  const me = await requireAdmin();
+  const me = await requirePermission('money');
   const list = await funds(me);
 
   return (

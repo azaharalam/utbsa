@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { allPosts } from '@/lib/queries/content';
 import { Card, Button, Pill, Empty } from '@/components/ui';
 
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Posts' };
 
 export default async function PostsAdmin() {
-  const me = await requireAdmin();
+  const me = await requirePermission('content');
   const posts = await allPosts(me);
 
   return (

@@ -1,21 +1,23 @@
-import { requireAdmin } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { donations, funds } from '@/lib/queries/donations';
 import { Card, Pill, Empty } from '@/components/ui';
 import { Money } from '@/components/money/forms';
 import DonationForm from './form';
-import AckButton from './ack';
-import FundPicker from './fund-picker';
+import Gift from './gift';
+
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Donations' };
 
 export default async function Donations() {
-  const me = await requireAdmin();
+  const me = await requirePermission('money');
   const [list, fundList] = await Promise.all([donations(me), funds(me)]);
 
   const unacked = list.filter((d) => !d.acknowledged_at);
   const cashTotal = list.filter((d) => !d.is_in_kind).reduce((s, d) => s + d.amount_cents, 0);
-  const fundOpts = fundList.map((f) => ({ id: f.id, name: f.name }));
+  const fundOpts = fundList.map((f) => ({
+    id: f.id, name: f.name, is_restricted: f.is_restricted,
+  }));
 
   return (
     <>
@@ -45,32 +47,19 @@ export default async function Donations() {
         <DonationForm />
 
         <div>
-          <h2 className="mb-3 font-display text-lg font-bold">Recent gifts</h2>
+          <h2 className="mb-1 font-display text-lg font-bold">Recent gifts</h2>
+      <p className="mb-3 max-w-2xl text-sm text-ink-mid">
+        Every gift sits in one fund. That is the whole relationship: a
+        <strong> donation</strong> is money arriving, a <strong>fund</strong> is the
+        pot it lands in. Most gifts belong in General, which can be spent on
+        anything. Move one into a restricted fund when it was given for a
+        particular purpose — that is what stops Boishakh money quietly paying for
+        a cricket tournament.
+      </p>
           {list.length ? (
             <div className="space-y-3">
               {list.slice(0, 30).map((d) => (
-                <Card key={d.id} className="p-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-display text-[15px] font-bold">{d.donor_name}</p>
-                      <p className="text-xs text-ink-mid">
-                        {new Date(d.received_on).toLocaleDateString('en-US',
-                          { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {d.is_in_kind ? ' · goods, not cash' : ` · ${d.method}`}
-                      </p>
-                      {d.in_kind_description && (
-                        <p className="text-xs text-ink-mid">{d.in_kind_description}</p>
-                      )}
-                    </div>
-                    <span className="font-display text-lg font-bold">
-                      <Money cents={d.amount_cents} />
-                    </span>
-                    <FundPicker donationId={d.id} current={d.fund_id} funds={fundOpts} />
-                    {d.acknowledged_at
-                      ? <Pill tone="green">thanked</Pill>
-                      : <AckButton id={d.id} />}
-                  </div>
-                </Card>
+                <Gift key={d.id} gift={d} funds={fundOpts} />
               ))}
             </div>
           ) : (

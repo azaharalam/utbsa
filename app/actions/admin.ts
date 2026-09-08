@@ -60,19 +60,6 @@ export async function setMemberStatus(_prev: FormState, fd: FormData): Promise<F
   }
 }
 
-export async function setMemberRole(_prev: FormState, fd: FormData): Promise<FormState> {
-  try {
-    const me = await requireAdmin();
-    const id = String(fd.get('id'));
-    const role = String(fd.get('role')) as 'member' | 'admin';
-    await Members.setRole(me, id, role);
-    await audit(me.id, 'member.role', 'member', id, { role });
-    revalidatePath('/admin/members');
-    return { ok: 'Updated.' };
-  } catch (e) {
-    return { error: (e as Error).message };
-  }
-}
 
 export async function savePost(_prev: FormState, fd: FormData): Promise<FormState> {
   try {
@@ -121,6 +108,7 @@ export async function saveEvent(_prev: FormState, fd: FormData): Promise<FormSta
       location_name: String(fd.get('location_name') ?? '').trim() || null,
       location_addr: String(fd.get('location_addr') ?? '').trim() || null,
       is_public: fd.get('is_public') === 'on',
+      isPotluck: fd.get('is_potluck') === 'on',
     });
 
     await audit(me.id, 'event.save', 'event', id, { slug });

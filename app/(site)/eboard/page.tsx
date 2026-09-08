@@ -1,15 +1,16 @@
-import { officers, currentTerm } from '@/lib/queries/content';
+import { officers } from '@/lib/queries/content';
+import { getSettings } from '@/lib/queries/settings';
 import { Card, Avatar, Empty } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'E-board' };
 
 export default async function EBoard() {
-  const [term, board] = await Promise.all([currentTerm(), officers()]);
+  const [settings, board] = await Promise.all([getSettings(), officers()]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <p className="mb-1.5 font-display text-sm font-semibold text-kantha">{term?.name ?? 'Current term'}</p>
+      <p className="mb-1.5 font-display text-sm font-semibold text-kantha">{settings.current_session}</p>
       <h1 className="mb-2 font-display text-3xl font-bold sm:text-4xl">Who&apos;s running things this year</h1>
       <p className="mb-8 max-w-2xl text-ink-mid">
         Elected each spring by members in good standing. Email any of us — that is what we are here for.
