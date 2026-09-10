@@ -79,7 +79,7 @@ NEXT_PUBLIC_PROD_URL=https://utoledobsa.org
 
 MAIL_TRANSPORT=smtp
 SMTP_HOST=email-smtp.us-east-2.amazonaws.com
-SMTP_PORT=587
+SMTP_PORT=2587   # NOT 587 — DigitalOcean blocks it
 SMTP_USER=
 SMTP_PASS=
 MAIL_FROM="UTBSA staging <noreply@utoledobsa.org>"

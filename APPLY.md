@@ -1,12 +1,12 @@
-# The 504 on sign-in
+# Sign-in links pointed at localhost
 
-**51 files.** Two causes, both fixed.
+**8 files.**
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-hangfix/. .
+cp -r ~/Downloads/utbsa-redirfix/. .
 npm run build
-git add -A && git commit -m "smtp timeouts, defensive form state" && git push
+git add -A && git commit -m "redirect to the real site, not the proxy origin" && git push
 ```
 
 Then on staging:
@@ -18,63 +18,51 @@ cd /srv/utbsa-staging && git pull && npm ci && npm run build \
 
 ---
 
-## Why it hung
+## What went wrong
 
-`sendMail` had **no timeouts**. If the SMTP host is unreachable, nodemailer
-waits — the server action waits, the request waits, and nginx gives up at 60
-seconds with a 504.
+The verify route built its redirects from `request.nextUrl.origin`.
 
-Now: 10s to connect, 10s for the greeting, 20s for the socket. A healthy send
-takes well under a second, so this only ever fires on a real problem — and
-turns a hang into an error the form can show.
+Behind nginx, the app sees the request arriving at **127.0.0.1:3001** — so
+`origin` is localhost, and every redirect sent the browser to an address that
+does not exist outside the server.
 
-The sign-in and signup actions also **catch** mail failures now. The token is
-already issued, so the person can just try again, and the real reason goes to
-the log instead of vanishing into a 504.
+Worse, the token is consumed **before** the redirect. So the first click
+worked, spent the token, and dumped you on a dead URL. Clicking again gave
+`error=expired`, which is why it looked like the link had expired when it had
+actually succeeded.
 
-## Why the page then broke
+Now the redirect uses `NEXT_PUBLIC_SITE_URL`, falling back to the
+`X-Forwarded-*` headers, and only using the request origin as a last resort
+for local development.
 
-```
-TypeError: Cannot read properties of undefined (reading 'error')
-```
+## The error page now explains itself
 
-Every form read `state.error` directly. When an action times out it returns
-nothing, so `state` is undefined and reading `.error` off it **white-screens
-the entire page** — a worse failure than the one that caused it.
+Landing on a bare sign-in form after clicking a link you were told would work
+looks like nothing happened. It now says which of the three things went wrong:
 
-All 48 form components now use `state?.error`. The form shows the error
-instead of the page disappearing.
+- **expired** — used already, or over 30 minutes old. Links work once, on
+  purpose. Request another.
+- **missing** — the link was truncated, which some email apps do to long URLs
+- **nouser** — no account for that address
 
-## First, find out why SMTP is unreachable
+## Also: the port
 
-The timeouts stop the hang; they do not explain it. On the droplet:
+DigitalOcean blocks 25, 465 and 587 on **every** Droplet. Not configurable,
+not a firewall setting on your side — platform policy to prevent spam.
 
-```bash
-# can it reach SES at all?
-nc -zv email-smtp.us-east-2.amazonaws.com 587
-
-# and does the app agree?
-cd /srv/utbsa-staging && npm run mail:test -- azaharalam2233@gmail.com
-```
-
-If `nc` hangs or refuses, it is the network. Try forcing IPv4 — the same thing
-that affected the fonts:
-
-```bash
-NODE_OPTIONS="--dns-result-order=ipv4first" npm run mail:test -- azaharalam2233@gmail.com
-```
-
-If that works, add to `.env.production`:
+SES also listens on **2587**, which is not blocked. One line in
+`.env.production`:
 
 ```
-NODE_OPTIONS=--dns-result-order=ipv4first
+SMTP_PORT=2587
 ```
 
-and restart. **This is the most likely cause** — DigitalOcean assigns an IPv6
-address whose route often does not work, Node tries it first, and everything
-outbound stalls. It is exactly what the font downloads did.
+`.env.example` and all three deploy guides now say so, and the doctor warns in
+production if it sees 587 or 465. This is exactly the kind of thing that costs
+somebody an evening in two years.
 
-## Two doctor checks
+## Three doctor checks
 
-- **forms survive an action that returns nothing**
-- **a stalled mail server fails fast**
+- **sign-in links redirect to the real address**
+- **a stalled mail server fails fast** (the 10s SMTP timeouts)
+- a production warning when `SMTP_PORT` is one DigitalOcean blocks

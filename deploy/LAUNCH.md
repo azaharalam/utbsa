@@ -122,7 +122,7 @@ NEXT_PUBLIC_SITE_URL=https://utoledobsa.org
 
 MAIL_TRANSPORT=smtp
 SMTP_HOST=email-smtp.AWS_REGION.amazonaws.com
-SMTP_PORT=587
+SMTP_PORT=2587   # NOT 587 — DigitalOcean blocks it
 SMTP_USER=
 SMTP_PASS=
 MAIL_FROM="UTBSA <noreply@utoledobsa.org>"

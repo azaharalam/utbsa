@@ -361,6 +361,11 @@ async function main() {
              'Every magic link is built from this. Wrong here means nobody can sign in.');
 
     if (process.env.MAIL_TRANSPORT === 'smtp') ok('email is configured to send');
+    if (process.env.SMTP_PORT === '587' || process.env.SMTP_PORT === '465') {
+      meh(`SMTP_PORT is ${process.env.SMTP_PORT}`,
+          'DigitalOcean blocks 25, 465 and 587 on all Droplets. '
+          + 'SES also accepts 2587 — use that.');
+    }
     else bad('MAIL_TRANSPORT is not smtp in production',
              'The site will work perfectly and nobody will receive anything.');
 
@@ -420,6 +425,16 @@ async function main() {
   if (!unguarded.length) ok('forms survive an action that returns nothing');
   else bad(`these read form state without optional chaining: ${unguarded.join(', ')}`,
            'A timed-out action white-screens the page. Use state?.error.');
+
+  // Behind nginx the app sees 127.0.0.1:3001, so a redirect built from the
+  // request origin sends people to localhost — with the token already spent.
+  const verifySrc = read('app/auth/verify/route.ts') ?? '';
+  if (verifySrc.includes('NEXT_PUBLIC_SITE_URL')) {
+    ok('sign-in links redirect to the real address');
+  } else {
+    bad('the verify route builds redirects from the request origin',
+        'Behind a proxy that is 127.0.0.1:3001, so the link lands nowhere.');
+  }
 
   // SMTP without timeouts hangs the request until nginx gives up at 60s.
   const mailSrc = read('lib/mail.ts') ?? '';
