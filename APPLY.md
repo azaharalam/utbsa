@@ -1,87 +1,89 @@
-# The last two bundles, combined
-
-`utbsa-bulk` and `utbsa-staging` in one, with the newest version of every file
-— including all the deploy scripts. Apply this and you are current.
+# Three deploy blockers
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-final/. .
-rm -rf .next
-npm run doctor
-git add -A && git commit -m "ready to deploy" && git push
+cp -r ~/Downloads/utbsa-deployfix/. .
+npm run build          # let it finish this time
+git add -A && git commit -m "fix DirectoryEntry type" && git push
 ```
 
 ---
 
-## 1. Batch email that survives a rate limit
+## 1. The type error — fixed in this bundle
 
-**This one matters before Friday.** SES sandbox allows **1 email per second**,
-and even in production there is a rate cap.
+`directory()` selects `arrival_semester` and `arrival_year`, but the
+`DirectoryEntry` type never declared them. My copy of the directory page did
+not use those fields, so my build passed and yours did not.
 
-The old dues reminder was:
+Both fixed: the type now declares them, and the card shows *"Since fall 2024"*.
 
-```ts
-for (const r of rows) {
-  await sendMail({ to: r.email, ... });   // one throw kills the batch
-}
+---
+
+## 2. `EACCES: .env.production` on the droplet
+
+You are building as `deploy`, but the file is owned by `utbsa` with mode 600 —
+so `deploy` cannot read it.
+
+Both users need it: `deploy` to build, `utbsa` to run.
+
+```bash
+cd /srv/utbsa
+sudo chown deploy:utbsa .env.production
+chmod 640 .env.production
 ```
 
-Send to a hundred members and the rate limit trips partway. The action throws,
-the treasurer sees a generic error, and **nothing indicates sixty already
-went**. The natural response is to retry — which sends those sixty a second
-copy and burns the quota twice.
+Owner `deploy` (read/write, for building), group `utbsa` (read, for running),
+nobody else. Confirm:
 
-Now each recipient is attempted independently:
-
-```
-Sent to 60 members. Stopped before 40 members. The email provider has refused
-further messages for now — usually the daily limit. Nobody was written to
-twice — send the rest tomorrow and only those who were missed will get it.
+```bash
+ls -l .env.production     # -rw-r----- 1 deploy utbsa
 ```
 
-There is a 120ms pause between messages, which keeps you under the 1/second
-sandbox limit without any scheduling.
+---
 
-## 2. Staging safety, and robots.txt
+## 3. Fonts failing to download
 
-**`MAIL_REDIRECT_TO`** — when set, every email goes to that one address
-regardless of who it was addressed to, with the intended recipient in the
-subject. Without it, testing the dues reminder on staging emails your real
-membership, and there is no recall.
+`next/font/google` fetches Noto Sans and Baloo Da 2 at build time. Your droplet
+could not reach `fonts.gstatic.com`.
 
-The doctor fails if `STAGING=true` with live unredirected mail, and also fails
-if `MAIL_REDIRECT_TO` is ever set in production.
+Almost always IPv6: DigitalOcean assigns an IPv6 address but the route does not
+always work, and Node tries IPv6 first and hangs.
 
-**`app/robots.ts`** — matters for production, not just staging. It tells search
-engines to index the public site but never `/admin`, `/portal`, `/auth`, or
-`/pay`. You want this live on day one.
+**Try this first:**
 
-**A red banner** on every page when `STAGING=true`, so staging cannot be
-mistaken for the real site.
+```bash
+cd /srv/utbsa
+NODE_OPTIONS="--dns-result-order=ipv4first" npm run build
+```
 
-**`lib/mail.ts`** also fixes the fallback sender from `noreply@utbsa.org` — a
-domain you do not own, which SES would reject — to `noreply@utoledobsa.org`.
+If that fixes it, make it permanent by adding to `.env.production`:
 
-## 3. All the deploy scripts
+```bash
+NODE_OPTIONS=--dns-result-order=ipv4first
+```
 
-`bootstrap.sh`, `deploy.sh`, `backup.sh`, the nginx configs, the systemd units,
-and the three guides: `LAUNCH.md`, `DEPLOY.md`, `STAGING.md`.
+**Check whether it is really the network:**
 
-They live in the repo, so the droplet gets them with the clone and the next
-person inherits them.
+```bash
+curl -sI https://fonts.gstatic.com | head -1     # expect HTTP/2 200
+curl -6 -sI https://fonts.gstatic.com | head -1  # this one may hang — that is the clue
+```
+
+**If it still fails**, the durable fix is to stop depending on Google at build
+time at all — self-host the two fonts. Say the word and I will send that; it is
+about fifteen minutes and it means your build never needs the internet for
+anything but npm.
 
 ---
 
 ## Then
 
 ```bash
-git push
+cd /srv/utbsa
+git pull
+npm ci
+npm run build
+npm run db:migrate
+npm run db:seed        # NOT db:demo
+npm run doctor
 ```
-
-and on the droplet, after `bootstrap.sh`:
-
-```bash
-cd /srv && git clone https://github.com/azaharalam/utbsa.git utbsa
-```
-
-Your branch is **master**, not main — worth remembering.

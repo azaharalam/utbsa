@@ -43,6 +43,9 @@ export type DirectoryEntry = {
   full_name: string;
   member_type: string;
   student_level: string | null;
+  // Selected by directory() — declared here so pages can show "Since fall 2024".
+  arrival_semester: string | null;
+  arrival_year: number | null;
   photo_url: string | null;
   email: string | null;
   phone: string | null;
