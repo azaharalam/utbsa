@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { requireApproved } from '@/lib/session';
-import { hasAnyAdminAccess } from '@/lib/permissions';
+import { hasAnyAdminAccess, heldOffices } from '@/lib/permissions';
 import PortalNav from '@/components/portal-nav';
-import SignOutButton from '@/components/sign-out';
-import { Avatar } from '@/components/ui';
+import UserMenu from '@/components/user-menu';
+import AppFooter from '@/components/app-footer';
+
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export const dynamic = 'force-dynamic';
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const me = await requireApproved();
   const isOfficer = await hasAnyAdminAccess(me.id);
+  const offices = await heldOffices(me.id);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -27,14 +29,10 @@ export default async function PortalLayout({ children }: { children: React.React
             UTBSA <span className="text-[13px] font-semibold text-kantha">ইউটিবিএসএ</span>
           </Link>
           <Link href="/" className="hidden text-sm text-ink-mid hover:text-nil sm:block">Public site</Link>
-          <div className="ml-auto flex items-center gap-3">
-            {isOfficer && (
-              <Link href="/admin" className="rounded-lg bg-nil px-3 py-1.5 text-xs font-semibold text-white">
-                Admin
-              </Link>
-            )}
-            <span className="hidden text-sm text-ink-mid sm:block">{me.full_name}</span>
-            <Avatar name={me.full_name} url={me.photo_url} size={34} />
+          <div className="ml-auto">
+            <UserMenu name={me.full_name} photoUrl={me.photo_url}
+              isOfficer={isOfficer} surface="portal"
+              officeTitle={offices[0]?.title ?? null} />
           </div>
         </div>
       </header>
@@ -57,9 +55,7 @@ export default async function PortalLayout({ children }: { children: React.React
         <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>
       </div>
 
-      <div className="border-t-2 border-dashed border-stitch px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-6xl"><SignOutButton /></div>
-      </div>
+      <AppFooter />
     </div>
   );
 }

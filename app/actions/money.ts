@@ -11,6 +11,7 @@ import * as Claims from '@/lib/queries/claims';
 import { parseAmount } from '@/lib/money';
 import { sendMail } from '@/lib/mail';
 import { getSettings } from '@/lib/queries/settings';
+import { sendBulk, describeBulk } from '@/lib/bulk-mail';
 import { sql } from '@/lib/db';
 import type { AdjustmentKind, PaymentMethod, DonorType } from '@/lib/money';
 
@@ -151,13 +152,14 @@ export async function sendReminders(_p: FormState, fd: FormData): Promise<FormSt
     const settings = await getSettings();
     const site = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
-    for (const r of rows) {
+    // Each recipient is attempted on its own. One bad address, or the
+    // provider's daily limit, must not take the rest of the batch with it.
+    const result = await sendBulk(rows, async (r) => {
       const owed = (Number(r.balance) / 100).toFixed(2);
       // A fresh link each time, which quietly retires any older one.
       const token = await Claims.issueClaimToken(r.id);
 
-      await sendMail({
-        to: r.email,
+      return {
         subject: 'UTBSA dues — no rush',
         text: `Assalamu alaikum ${r.full_name.split(' ')[0]},\n\n`
             + `Your dues balance is currently $${owed}. If you missed a semester it has carried over, which is normal and nothing to worry about.\n\n`
@@ -169,11 +171,15 @@ export async function sendReminders(_p: FormState, fd: FormData): Promise<FormSt
             + `The treasurer checks it against the account, so your balance will not update straight away.\n\n`
             + `If now isn't a good time, please tell us. We have a fund for exactly this and nobody needs to explain themselves.\n\n`
             + `— UTBSA`,
-      });
-    }
+      };
+    });
 
     revalidatePath('/admin/dues');
-    return { ok: `Reminder sent to ${rows.length} member${rows.length === 1 ? '' : 's'}.` };
+
+    // Report what actually happened, not how many rows were selected.
+    return result.stoppedEarly || result.failed.length
+      ? { error: describeBulk(result) }
+      : { ok: describeBulk(result) };
   } catch (e) { return { error: friendlyDbError(e) }; }
 }
 

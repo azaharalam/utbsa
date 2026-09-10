@@ -1,0 +1,32 @@
+# /etc/systemd/system/utbsa-staging.service
+#
+# The same app, a different port, a different database, and — most
+# importantly — MAIL_REDIRECT_TO set so nothing reaches a real member.
+
+[Unit]
+Description=UTBSA staging
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=utbsa
+Group=utbsa
+WorkingDirectory=/srv/utbsa-staging
+EnvironmentFile=/srv/utbsa-staging/.env.production
+ExecStart=/usr/bin/npm run start -- -p 3001
+
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/utbsa-staging/.next /srv/utbsa-staging/public/uploads /var/log/utbsa
+
+StandardOutput=append:/var/log/utbsa/staging-out.log
+StandardError=append:/var/log/utbsa/staging-err.log
+
+[Install]
+WantedBy=multi-user.target

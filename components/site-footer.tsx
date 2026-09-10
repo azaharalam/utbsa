@@ -20,6 +20,12 @@ export default function SiteFooter() {
           <Link href="/auth/login" className="hover:text-white">Sign in</Link>
         </nav>
       </div>
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-white/50 sm:px-6">
+          <span>© {new Date().getFullYear()} University of Toledo Bangladeshi Students Association</span>
+          <span className="ml-auto">Developed by ZenNpsi</span>
+        </div>
+      </div>
     </footer>
   );
 }

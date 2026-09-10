@@ -10,12 +10,12 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "tsx scripts/reset.ts",
     "db:admin": "tsx scripts/make-admin.ts",
-    "dev:clean": "pkill -f 'next dev' ; pkill -f next-server ; rm -rf .next ; next dev",
     "db:demo": "tsx scripts/seed-demo.ts",
-    "doctor": "tsx scripts/doctor.ts"
+    "doctor": "tsx scripts/doctor.ts",
+    "mail:test": "tsx scripts/mail-test.ts"
   },
   "dependencies": {
-    "next": "^14.2.35",
+    "next": "14.2.15",
     "nodemailer": "^6.9.14",
     "postgres": "^3.4.4",
     "react": "^18.3.1",

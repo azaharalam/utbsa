@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Baloo_Da_2, Noto_Sans } from 'next/font/google';
 import './globals.css';
+import StagingBanner from '@/components/staging-banner';
 
 const display = Baloo_Da_2({
   subsets: ['latin', 'bengali'],
@@ -25,7 +26,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body className="font-body antialiased">{children}</body>
+      <body className="font-body antialiased">
+        <StagingBanner />{children}</body>
     </html>
   );
 }

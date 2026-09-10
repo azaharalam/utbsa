@@ -1,0 +1,39 @@
+# /etc/systemd/system/utbsa.service
+#
+# Runs the app as its own user with no shell. If Node is ever compromised,
+# the attacker lands as `utbsa` and not as root.
+
+[Unit]
+Description=UTBSA website
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=utbsa
+Group=utbsa
+WorkingDirectory=/srv/utbsa
+
+# Environment lives in a file readable only by this user, not in this unit —
+# systemd units are world-readable and would leak the database password.
+EnvironmentFile=/srv/utbsa/.env.production
+
+ExecStart=/usr/bin/node_modules/.bin/next start -p 3000
+# If you installed Node via nvm, use the absolute path from `which node`:
+# ExecStart=/usr/bin/npm run start
+
+Restart=always
+RestartSec=5
+
+# The app should not be able to write anywhere it does not need to.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/utbsa/.next /srv/utbsa/public/uploads /var/log/utbsa
+
+StandardOutput=append:/var/log/utbsa/out.log
+StandardError=append:/var/log/utbsa/err.log
+
+[Install]
+WantedBy=multi-user.target

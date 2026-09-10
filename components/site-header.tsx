@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import UserMenu from '@/components/user-menu';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -15,7 +16,12 @@ const links = [
   { href: '/contact', label: 'Contact' },
 ];
 
-export default function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
+export default function SiteHeader({
+  signedIn = false, user = null,
+}: {
+  signedIn?: boolean;
+  user?: { name: string; photoUrl: string | null; isOfficer: boolean } | null;
+}) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
 
@@ -36,13 +42,30 @@ export default function SiteHeader({ signedIn = false }: { signedIn?: boolean })
               {l.label}
             </Link>
           ))}
-          <Link
-            href={signedIn ? '/portal' : '/join'}
-            className="rounded-lg bg-kantha px-4 py-2 text-sm font-semibold text-white"
-          >
-            {signedIn ? 'Portal' : 'Join'}
-          </Link>
+          {signedIn && user ? (
+            <UserMenu name={user.name} photoUrl={user.photoUrl}
+              isOfficer={user.isOfficer} surface="public" />
+          ) : (
+            <>
+              <Link href="/auth/login" className="text-sm text-ink-mid hover:text-nil">
+                Sign in
+              </Link>
+              <Link href="/join"
+                className="rounded-lg bg-kantha px-4 py-2 text-sm font-semibold text-white">
+                Join
+              </Link>
+            </>
+          )}
         </nav>
+
+        {/* On mobile the avatar sits beside the hamburger rather than inside it —
+            it is the control people reach for most. */}
+        {signedIn && user && (
+          <div className="md:hidden">
+            <UserMenu name={user.name} photoUrl={user.photoUrl}
+              isOfficer={user.isOfficer} surface="public" />
+          </div>
+        )}
 
         <button
           onClick={() => setOpen(!open)}
@@ -66,13 +89,16 @@ export default function SiteHeader({ signedIn = false }: { signedIn?: boolean })
               {l.label}
             </Link>
           ))}
-          <Link
-            href={signedIn ? '/portal' : '/join'}
-            onClick={() => setOpen(false)}
-            className="mt-4 block rounded-lg bg-kantha px-4 py-3 text-center text-sm font-semibold text-white"
-          >
-            {signedIn ? 'Go to portal' : 'Join UTBSA'}
-          </Link>
+          {signedIn ? null : (
+              <>
+                <Link href="/auth/login" onClick={() => setOpen(false)}
+                  className="block py-2 text-sm text-ink-mid">Sign in</Link>
+                <Link href="/join" onClick={() => setOpen(false)}
+                  className="mt-2 block rounded-lg bg-kantha px-4 py-2.5 text-center text-sm font-semibold text-white">
+                  Join UTBSA
+                </Link>
+              </>
+            )}
         </nav>
       )}
     </header>

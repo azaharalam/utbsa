@@ -15,6 +15,23 @@ const transport =
       })
     : null;
 
+/**
+ * ─────────────────────────────────────────────────────────────
+ * THE STAGING SAFETY VALVE
+ *
+ * A staging site with real SMTP credentials can email the entire membership.
+ * Testing the dues reminder once would send a hundred real people a real
+ * email from a test system — and there is no way to recall it.
+ *
+ * So when MAIL_REDIRECT_TO is set, every message goes there instead,
+ * whoever it was addressed to. The intended recipient is put in the subject
+ * so the redirect is obvious rather than confusing.
+ *
+ * Set it on staging. Never set it in production.
+ * ─────────────────────────────────────────────────────────────
+ */
+const redirectTo = process.env.MAIL_REDIRECT_TO?.trim() || null;
+
 export async function sendMail(opts: { to: string; subject: string; text: string; html?: string }) {
   if (!transport) {
     console.log('\n' + '─'.repeat(72));
@@ -27,8 +44,20 @@ export async function sendMail(opts: { to: string; subject: string; text: string
     return;
   }
 
+  if (redirectTo) {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM ?? 'UTBSA <noreply@utoledobsa.org>',
+      to: redirectTo,
+      subject: `[staging → ${opts.to}] ${opts.subject}`,
+      text: `This message was addressed to ${opts.to} and redirected here `
+          + `because MAIL_REDIRECT_TO is set.\n\n`
+          + `${'─'.repeat(60)}\n\n${opts.text}`,
+    });
+    return;
+  }
+
   await transport.sendMail({
-    from: process.env.MAIL_FROM ?? 'UTBSA <noreply@utbsa.org>',
+    from: process.env.MAIL_FROM ?? 'UTBSA <noreply@utoledobsa.org>',
     ...opts,
   });
 }

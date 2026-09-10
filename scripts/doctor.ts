@@ -7,7 +7,7 @@
  * Every failure prints the exact fix.
  */
 import './env';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
 import postgres from 'postgres';
 
@@ -123,6 +123,9 @@ async function main() {
     ['components/money/form-result.tsx', 'form success behaviour'],
     ['lib/audit-display.ts', 'audit diff formatting'],
     ['lib/calendar.ts', 'calendar links'],
+    ['lib/bulk-mail.ts', 'resilient batch sending'],
+    ['components/user-menu.tsx', 'account menu'],
+    ['components/app-footer.tsx', 'in-app footer'],
     ['lib/queries/sponsors.ts', 'sponsors and financial summary'],
     ['app/actions/auth.ts', 'signup and login'],
     ['app/actions/profile.ts', 'profile editing'],
@@ -305,6 +308,93 @@ async function main() {
   if (adminHome.includes('QuickApprove')) ok('members can be approved from the overview');
   else bad('admin overview has no inline approve');
 
+  // Signing out, your profile, and the way between admin and portal are all
+  // "about you" — scattering them across a header and a footer means nobody
+  // finds any of them.
+  for (const [layout, surface] of [
+    ['app/portal/layout.tsx', 'portal'], ['app/admin/layout.tsx', 'admin'],
+  ] as [string, string][]) {
+    const src = read(layout) ?? '';
+    if (src.includes('UserMenu')) ok(`${surface}: account actions are in one menu`);
+    else bad(`${surface} layout does not use UserMenu`,
+             'Sign out and the profile link should live behind the avatar.');
+  }
+
+  const publicFooter = read('components/site-footer.tsx') ?? '';
+  if (publicFooter.includes('ZenNpsi')) ok('public footer credits the developer');
+  else bad('the public footer has no attribution');
+
+  /**
+   * The two ways a staging site does real damage: emailing real members, and
+   * being mistaken for the live site.
+   */
+  if (process.env.STAGING === 'true') {
+    if (process.env.MAIL_REDIRECT_TO || process.env.MAIL_TRANSPORT !== 'smtp') {
+      ok('staging cannot email real members');
+    } else {
+      bad('STAGING is true but mail is live and unredirected',
+          'Testing the dues reminder would email every member for real. '
+          + 'Set MAIL_REDIRECT_TO in .env.production.');
+    }
+
+    if ((process.env.DATABASE_URL ?? '').includes('utbsa_staging')) {
+      ok('staging is on its own database');
+    } else {
+      bad('STAGING is true but DATABASE_URL does not point at utbsa_staging',
+          'Staging is writing to the production database.');
+    }
+  }
+
+  // Never the other way round.
+  if (process.env.NODE_ENV === 'production' && process.env.STAGING !== 'true'
+      && process.env.MAIL_REDIRECT_TO) {
+    bad('MAIL_REDIRECT_TO is set in production',
+        'Every member email is going to one address instead of the member.');
+  }
+
+  // Things that only matter once it is a real site on a real domain.
+  if (process.env.NODE_ENV === 'production') {
+    const url = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+    if (url.startsWith('https://')) ok('site URL is https');
+    else bad(`NEXT_PUBLIC_SITE_URL is "${url}"`,
+             'Every magic link is built from this. Wrong here means nobody can sign in.');
+
+    if (process.env.MAIL_TRANSPORT === 'smtp') ok('email is configured to send');
+    else bad('MAIL_TRANSPORT is not smtp in production',
+             'The site will work perfectly and nobody will receive anything.');
+
+    const upload = join(root, 'public', 'uploads');
+    try {
+      if (lstatSync(upload).isSymbolicLink()) ok('uploads survive a deploy');
+      else meh('public/uploads is a real directory',
+               'Member photos will be lost on the next deploy. See deploy/DEPLOY.md step 4.');
+    } catch {
+      meh('public/uploads does not exist yet', 'It is created on the first photo upload.');
+    }
+  }
+
+  // Sign out, your profile, and the cross-link between surfaces are all
+  // "about you" — they belong in one place, and the same place everywhere.
+  const surfaces: [string, string][] = [
+    ['app/(site)/layout.tsx', 'public'],
+    ['app/portal/layout.tsx', 'portal'],
+    ['app/admin/layout.tsx', 'admin'],
+  ];
+  const withoutMenu = surfaces
+    .filter(([f]) => !(read(f) ?? '').includes('SiteHeader') || f !== 'app/(site)/layout.tsx'
+      ? !/UserMenu|SiteHeader/.test(read(f) ?? '')
+      : false)
+    .map(([, name]) => name);
+  if (!withoutMenu.length) ok('all three surfaces put "you" in the same corner');
+  else bad(`no user menu on: ${withoutMenu.join(', ')}`);
+
+  const menuSrc = read('components/user-menu.tsx') ?? '';
+  if (menuSrc.includes("surface !== 'portal'") && menuSrc.includes("surface !== 'admin'")) {
+    ok('the user menu offers the surface you are not on');
+  } else {
+    bad('the user menu may list the page you are already on');
+  }
+
   // A form that discards its error state fails silently — the person clicks,
   // nothing happens, and there is nothing on screen to explain why.
   const clientFiles = walk(join(root, 'app'))
@@ -361,6 +451,21 @@ async function main() {
   if (!unresolved.length) ok('every form resolves when it succeeds');
   else bad(`these leave their fields filled: ${unresolved.join(', ')}`,
            'Pick one: ResetOnSuccess to clear, Confirmation to keep, Done to replace.');
+
+  // A loop of awaits over sendMail aborts on the first failure, leaving the
+  // sender with an error and no idea how many already went.
+  const bulkSenders = clientFiles
+    .concat(walk(join(root, 'app', 'actions')))
+    .concat(walk(join(root, 'lib', 'queries')))
+    .filter((f: string) => /\.tsx?$/.test(f) && !f.endsWith('bulk-mail.ts'));
+  const naive = bulkSenders.filter((f: string) => {
+    const src = readFileSync(f, 'utf8');
+    return /for \([^)]*\bof\b[^)]*\)\s*\{[\s\S]{0,900}?await sendMail\(/.test(src);
+  }).map((f: string) => f.replace(root + '/', ''));
+  if (!naive.length) ok('batch email survives one bad address');
+  else bad(`these loop over sendMail without catching: ${naive.join(', ')}`,
+           'One failure aborts the batch, and the sender cannot tell how many went.');
+
 
   // The dashboard is the page members see most. If everything on it is a
   // link out, it is a menu, not a dashboard.
