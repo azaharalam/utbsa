@@ -16,7 +16,7 @@ export default function BallotBox({
   const [state, action] = useFormState(castBallot, {});
   const [confirming, setConfirming] = useState(false);
 
-  useCloseOnSuccess(state.ok, () => setConfirming(false));
+  useCloseOnSuccess(state?.ok, () => setConfirming(false));
 
   return (
     <Card>
@@ -26,8 +26,8 @@ export default function BallotBox({
         changed afterwards — so take a moment.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <form action={action}>
         <input type="hidden" name="election_id" value={electionId} />

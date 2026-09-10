@@ -27,8 +27,8 @@ export default function DuesTable({
 
   // The inline waive / cover panel should shut once the adjustment lands —
   // leaving it open shows a form for money already moved.
-  useCloseOnSuccess(fundState.ok, () => setOpenRow(null));
-  useCloseOnSuccess(waiveState.ok, () => setOpenRow(null));
+  useCloseOnSuccess(fundState?.ok, () => setOpenRow(null));
+  useCloseOnSuccess(waiveState?.ok, () => setOpenRow(null));
 
   const owing = rows.filter((r) => r.balance_cents > 0);
   const toggle = (id: string) =>
@@ -39,12 +39,12 @@ export default function DuesTable({
 
   return (
     <>
-      {remindState.error && <Notice tone="error">{remindState.error}</Notice>}
-      {remindState.ok && <Notice tone="success">{remindState.ok}</Notice>}
-      {waiveState.error && <Notice tone="error">{waiveState.error}</Notice>}
-      {waiveState.ok && <Notice tone="success">{waiveState.ok}</Notice>}
-      {fundState.error && <Notice tone="error">{fundState.error}</Notice>}
-      {fundState.ok && <Notice tone="success">{fundState.ok}</Notice>}
+      {remindState?.error && <Notice tone="error">{remindState?.error}</Notice>}
+      {remindState?.ok && <Notice tone="success">{remindState?.ok}</Notice>}
+      {waiveState?.error && <Notice tone="error">{waiveState?.error}</Notice>}
+      {waiveState?.ok && <Notice tone="success">{waiveState?.ok}</Notice>}
+      {fundState?.error && <Notice tone="error">{fundState?.error}</Notice>}
+      {fundState?.ok && <Notice tone="success">{fundState?.ok}</Notice>}
 
       {owing.length > 0 && (
         <form action={remind} className="mb-4 flex flex-wrap items-center gap-3">

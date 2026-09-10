@@ -1,67 +1,80 @@
-# Giving someone an office — and a bug this found
+# The 504 on sign-in
 
-**3 files.**
+**51 files.** Two causes, both fixed.
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-officer/. .
-git add -A && git commit -m "db:officer replaces db:admin" && git push
+cp -r ~/Downloads/utbsa-hangfix/. .
+npm run build
+git add -A && git commit -m "smtp timeouts, defensive form state" && git push
 ```
 
 Then on staging:
 
 ```bash
-cd /srv/utbsa-staging && git pull
-npm run db:officer -- azaharalam2233@gmail.com "General Secretary" full \
-  --name "Md. Azahar Alam" --phone "419 246 7235"
+cd /srv/utbsa-staging && git pull && npm ci && npm run build \
+  && sudo systemctl restart utbsa-staging
 ```
 
 ---
 
-## The bug
+## Why it hung
 
-**`npm run db:admin` had stopped working.** It set `role = 'admin'`, and since
-migration 007 that column grants nothing — access comes from the office
-someone holds.
+`sendMail` had **no timeouts**. If the SMTP host is unreachable, nodemailer
+waits — the server action waits, the request waits, and nginx gives up at 60
+seconds with a 504.
 
-So it ran, printed "is now an active admin", and left the person with no access
-at all. You would have hit this creating the first admin on production, with a
-success message telling you it had worked.
+Now: 10s to connect, 10s for the greeting, 20s for the socket. A healthy send
+takes well under a second, so this only ever fires on a real problem — and
+turns a hang into an error the form can show.
 
-## The replacement
+The sign-in and signup actions also **catch** mail failures now. The token is
+already issued, so the person can just try again, and the real reason goes to
+the log instead of vanishing into a 504.
 
-```bash
-npm run db:officer -- <email> "<Office title>" <access> [--name "..."] [--phone "..."]
+## Why the page then broke
+
+```
+TypeError: Cannot read properties of undefined (reading 'error')
 ```
 
-| Access | Grants |
-|---|---|
-| `full` | everything, including assigning offices |
-| `money` | dues, transfers, donations, funds, ledger |
-| `members` | approvals, member records, posts, events |
-| `content` | posts and events |
-| `events` | events only |
-| `none` | listed publicly, no admin access |
+Every form read `state.error` directly. When an action times out it returns
+nothing, so `state` is undefined and reading `.error` off it **white-screens
+the entire page** — a worse failure than the one that caused it.
 
-It finds the member by **any** of their addresses, activates and approves them,
-and assigns the office for the current session. With `--name` it creates the
-member if they do not exist — which is how the first officer gets in on a fresh
-database, when there is nobody to do it from the admin UI.
+All 48 form components now use `state?.error`. The form shows the error
+instead of the page disappearing.
 
-Reassigning **ends** the previous office rather than stacking permissions, and
-the old one stays in the history.
+## First, find out why SMTP is unreachable
 
-It warns when fewer than two offices hold full access.
+The timeouts stop the hang; they do not explain it. On the droplet:
 
-`db:admin` still works as an alias, so anything referencing it keeps running.
+```bash
+# can it reach SES at all?
+nc -zv email-smtp.us-east-2.amazonaws.com 587
+
+# and does the app agree?
+cd /srv/utbsa-staging && npm run mail:test -- azaharalam2233@gmail.com
+```
+
+If `nc` hangs or refuses, it is the network. Try forcing IPv4 — the same thing
+that affected the fonts:
+
+```bash
+NODE_OPTIONS="--dns-result-order=ipv4first" npm run mail:test -- azaharalam2233@gmail.com
+```
+
+If that works, add to `.env.production`:
+
+```
+NODE_OPTIONS=--dns-result-order=ipv4first
+```
+
+and restart. **This is the most likely cause** — DigitalOcean assigns an IPv6
+address whose route often does not work, Node tries it first, and everything
+outbound stalls. It is exactly what the font downloads did.
 
 ## Two doctor checks
 
-- **nobody is flagged admin without an office** — catches exactly the state the
-  old script left people in
-- **first-officer bootstrap** — the script is present
-
-## After that
-
-Assign offices from `/admin/offices` rather than the command line, so the
-change is recorded in the audit log with who did it.
+- **forms survive an action that returns nothing**
+- **a stalled mail server fails fast**

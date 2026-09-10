@@ -79,7 +79,12 @@ export async function signUp(_prev: FormState, fd: FormData): Promise<FormState>
   // Same response whether or not the account existed. Otherwise this form
   // becomes a way to test which addresses are registered.
   const token = await Tokens.issueToken(primary, 'signup');
-  await sendMail({ to: primary, ...magicLinkEmail(token, true) });
+  try {
+    await sendMail({ to: primary, ...magicLinkEmail(token, true) });
+  } catch (e) {
+    console.error('signup email failed:', (e as Error).message);
+    return { error: 'Your details are saved, but we could not send the confirmation email. Please try signing in shortly.' };
+  }
 
   redirect(`/auth/check-email?email=${encodeURIComponent(primary)}&new=1`);
 }
@@ -96,7 +101,15 @@ export async function signIn(_prev: FormState, fd: FormData): Promise<FormState>
   const member = await Members.findByEmail(email);
   if (member) {
     const token = await Tokens.issueToken(email, 'login');
-    await sendMail({ to: email, ...magicLinkEmail(token, false) });
+    try {
+      await sendMail({ to: email, ...magicLinkEmail(token, false) });
+    } catch (e) {
+      // A mail failure must not take the page down. The token is already
+      // issued, so the person can try again — and we log the real reason
+      // rather than leaving a 504 and a blank screen.
+      console.error('sign-in email failed:', (e as Error).message);
+      return { error: 'We could not send the email just now. Please try again in a moment.' };
+    }
   }
   // No branch in the response — an attacker learns nothing either way.
 

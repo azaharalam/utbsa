@@ -39,8 +39,8 @@ export default function PostEditor({ post }: { post?: Post | null }) {
     <>
       <h1 className="mb-5 font-display text-2xl font-bold sm:text-3xl">{post ? 'Edit post' : 'New post'}</h1>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action}>
         <input type="hidden" name="id" value={post?.id ?? ''} />

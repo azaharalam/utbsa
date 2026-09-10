@@ -11,7 +11,7 @@ export default function GraduateBox({ memberType }: { memberType: string }) {
   const [state, action] = useFormState(requestStatusChange, {});
   const [open, setOpen] = useState(false);
 
-  useCloseOnSuccess(state.ok, () => setOpen(false));
+  useCloseOnSuccess(state?.ok, () => setOpen(false));
 
   if (memberType !== 'student') return null;
 
@@ -23,8 +23,8 @@ export default function GraduateBox({ memberType }: { memberType: string }) {
         and keep coming to everything — you just stop being charged semester dues.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       {open ? (
         <form action={action}>

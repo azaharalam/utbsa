@@ -35,7 +35,7 @@ export default function PotluckEditor({
   const [editing, setEditing] = useState<string | null>(null);
   const addRef = useRef<HTMLFormElement>(null);
 
-  const err = addState.error || dupState.error || editState.error || rmState.error;
+  const err = addState?.error || dupState?.error || editState?.error || rmState?.error;
   const covers = items.reduce((s, i) => s + i.covers, 0);
   const claimed = items.filter((i) => i.claimed_by).length;
 
@@ -60,8 +60,8 @@ export default function PotluckEditor({
       </div>
 
       {err && <Notice tone="error">{err}</Notice>}
-      <Confirmation message={dupState.ok} />
-      <Confirmation message={addState.ok} />
+      <Confirmation message={dupState?.ok} />
+      <Confirmation message={addState?.ok} />
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -143,7 +143,7 @@ export default function PotluckEditor({
             <tr className="border-t-2 border-dashed border-stitch">
               <td colSpan={5} className="pt-3">
                 <form action={add} ref={addRef} className="flex flex-wrap items-end gap-2">
-                  <ResetOnSuccess ok={addState.ok} formRef={addRef} />
+                  <ResetOnSuccess ok={addState?.ok} formRef={addRef} />
                   <input type="hidden" name="event_id" value={eventId} />
                   <div className="w-40">
                     <label className="mb-1 block text-xs font-semibold text-ink-mid">Category</label>

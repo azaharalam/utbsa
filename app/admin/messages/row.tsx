@@ -10,7 +10,7 @@ export default function MessageRow({ message }: { message: Message }) {
 
   return (
     <Card className={message.handled ? 'opacity-70' : ''}>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
 
       {message.kind === 'appeal' && (
         <div className="mb-3 rounded-lg border-2 border-dashed border-genda bg-[#FDF8EC] p-2.5">

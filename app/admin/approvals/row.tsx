@@ -17,9 +17,9 @@ export default function ApprovalRow({ member }: { member: Member }) {
   const [rejectState, reject] = useFormState(rejectMember, {});
   const [showReject, setShowReject] = useState(false);
 
-  useCloseOnSuccess(rejectState.ok, () => setShowReject(false));
+  useCloseOnSuccess(rejectState?.ok, () => setShowReject(false));
 
-  const err = approveState.error || rejectState.error;
+  const err = approveState?.error || rejectState?.error;
 
   return (
     <Card>

@@ -29,8 +29,8 @@ export default function OfficeAdmin({
           are history. One office per person.
         </p>
 
-        {assignState.error && <Notice tone="error">{assignState.error}</Notice>}
-        <Confirmation message={assignState.ok} />
+        {assignState?.error && <Notice tone="error">{assignState?.error}</Notice>}
+        <Confirmation message={assignState?.ok} />
 
         <form action={assign}>
           <Field label="Member" name="member_id" as="select"
@@ -51,8 +51,8 @@ export default function OfficeAdmin({
           the access stops.
         </p>
 
-        {endState.error && <Notice tone="error">{endState.error}</Notice>}
-        <Confirmation message={endState.ok} />
+        {endState?.error && <Notice tone="error">{endState?.error}</Notice>}
+        <Confirmation message={endState?.ok} />
 
         <form action={end}>
           <Field label="Office" name="id" as="select"

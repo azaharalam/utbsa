@@ -71,9 +71,9 @@ export default function RsvpBox({
         The headcount decides how much food we order, so please say either way.
       </p>
 
-      {saveState.error && <Notice tone="error">{saveState.error}</Notice>}
-      <Confirmation message={saveState.ok} />
-      <Confirmation message={cancelState.ok} />
+      {saveState?.error && <Notice tone="error">{saveState?.error}</Notice>}
+      <Confirmation message={saveState?.ok} />
+      <Confirmation message={cancelState?.ok} />
 
       <form action={save}>
         <input type="hidden" name="event_id" value={eventId} />

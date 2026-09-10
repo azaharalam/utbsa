@@ -20,7 +20,7 @@ export default function NominateBox({
 
   // Once it is in, there is nothing more to fill in here. The list refreshes
   // to show the nomination, but the form should not linger in the meantime.
-  if (state.ok) {
+  if (state?.ok) {
     return (
       <Done title="Submitted">
         <p className="text-sm text-ink-mid">
@@ -50,7 +50,7 @@ export default function NominateBox({
         {existing.status !== 'declined' && (
           <form action={withdraw} className="mt-4">
             <input type="hidden" name="id" value={existing.id} />
-            {wState.error && <Notice tone="error">{wState.error}</Notice>}
+            {wState?.error && <Notice tone="error">{wState?.error}</Notice>}
             <button type="submit" className="text-sm text-ink-mid hover:text-alta">
               Withdraw my nomination
             </button>
@@ -60,7 +60,7 @@ export default function NominateBox({
     );
   }
 
-  if (!eligible.ok) {
+  if (!eligible?.ok) {
     return (
       <Card>
         <h2 className="mb-1 font-display text-base font-bold">Standing for office</h2>
@@ -79,8 +79,8 @@ export default function NominateBox({
         One position each. An admin confirms nominations before the ballot is built.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <form action={action}>
         <input type="hidden" name="election_id" value={electionId} />

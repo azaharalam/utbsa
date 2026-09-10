@@ -35,8 +35,8 @@ export default function QuickPotluck({
 
   return (
     <div>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <p className="mb-2 text-sm text-ink-mid">
         Still needed — tap one and it&apos;s yours:

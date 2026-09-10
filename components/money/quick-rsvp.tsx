@@ -26,7 +26,7 @@ export default function QuickRsvp({
   const [adults, setAdults] = useState(a0 || Math.max(1, householdSize));
   const [children, setChildren] = useState(c0);
 
-  useCloseOnSuccess(state.ok, () => setOpen(false));
+  useCloseOnSuccess(state?.ok, () => setOpen(false));
 
   const step = (set: (n: number) => void, v: number, d: number, min: number) =>
     () => set(Math.max(min, Math.min(20, v + d)));
@@ -49,8 +49,8 @@ export default function QuickRsvp({
 
   return (
     <div>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <form action={action}>
         <input type="hidden" name="event_id" value={eventId} />

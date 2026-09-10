@@ -20,8 +20,8 @@ export default function PositionManager({
 
   return (
     <>
-      {addState.error && <Notice tone="error">{addState.error}</Notice>}
-      {rmState.error && <Notice tone="error">{rmState.error}</Notice>}
+      {addState?.error && <Notice tone="error">{addState?.error}</Notice>}
+      {rmState?.error && <Notice tone="error">{rmState?.error}</Notice>}
 
       <div className="mb-4 space-y-2">
         {positions.map((p) => (

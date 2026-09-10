@@ -23,15 +23,15 @@ export default function ResignBox({
   const [state, action] = useFormState(resignTo, {});
   const [open, setOpen] = useState(false);
 
-  useCloseOnSuccess(state.ok, () => setOpen(false));
+  useCloseOnSuccess(state?.ok, () => setOpen(false));
 
   const winner = plan?.winner_id ? { id: plan.winner_id, name: plan.winner_name! } : null;
   const tied = (plan?.tied ?? 0) > 1;
 
   return (
     <Card>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">

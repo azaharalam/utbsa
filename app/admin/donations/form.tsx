@@ -21,11 +21,11 @@ export default function DonationForm() {
         it was given for a specific purpose.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} also={() => setInKind(false)} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} also={() => setInKind(false)} />
 
         <Field label="Who gave it" name="donor_name" required placeholder="Dr. Mizanur Zaman" />
 

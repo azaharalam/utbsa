@@ -21,7 +21,7 @@ export default function PotluckBoard({
   const [relState, release] = useFormState(releasePotluckItem, {});
 
   const open = items.filter((i) => !i.claimed_by).length;
-  const err = claimState.error || relState.error;
+  const err = claimState?.error || relState?.error;
 
   const mine = (i: PotluckItem) =>
     i.claimed_by === meId ||
@@ -41,7 +41,7 @@ export default function PotluckBoard({
       </p>
 
       {err && <Notice tone="error">{err}</Notice>}
-      {claimState.ok && <Notice tone="success">{claimState.ok}</Notice>}
+      {claimState?.ok && <Notice tone="success">{claimState?.ok}</Notice>}
 
       <div className="space-y-5">
         {byCategory.map((c) => (

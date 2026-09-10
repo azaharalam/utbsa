@@ -15,8 +15,8 @@ export default function QuickApprove({ pending }: { pending: Member[] }) {
 
   return (
     <div>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <div className="space-y-2">
         {pending.slice(0, 3).map((p) => (

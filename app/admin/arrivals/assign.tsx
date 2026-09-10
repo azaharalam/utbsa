@@ -32,7 +32,7 @@ export default function Assign({
   const [dropState, drop] = useFormState(unassignArrival, {});
   const [open, setOpen] = useState(false);
 
-  const err = assignState.error || dropState.error;
+  const err = assignState?.error || dropState?.error;
   const closed = arrival.status === 'done' || arrival.status === 'cancelled';
 
   /**
@@ -40,7 +40,7 @@ export default function Assign({
    * shows a dropdown for a job already done — it reads as though nothing
    * happened, and invites assigning the same person twice.
    */
-  useCloseOnSuccess(assignState.ok, () => setOpen(false));
+  useCloseOnSuccess(assignState?.ok, () => setOpen(false));
 
   const band = 'mt-3 border-t-2 border-dashed border-stitch pt-3';
 
@@ -103,7 +103,7 @@ export default function Assign({
     return (
       <div className={band}>
         {err && <Notice tone="error">{err}</Notice>}
-        {assignState.ok && <Notice tone="success">{assignState.ok}</Notice>}
+        {assignState?.ok && <Notice tone="success">{assignState?.ok}</Notice>}
         <div className="flex flex-wrap items-center gap-3">
           <Avatar name={arrival.claimed_by_name ?? '?'} size={28} />
           <span className="text-sm">
@@ -130,7 +130,7 @@ export default function Assign({
   return (
     <div className={band}>
       {err && <Notice tone="error">{err}</Notice>}
-      {dropState.ok && <Notice tone="info">{dropState.ok}</Notice>}
+      {dropState?.ok && <Notice tone="info">{dropState?.ok}</Notice>}
       <div className="flex flex-wrap items-center gap-3">
         <Pill tone="gold">nobody assigned</Pill>
         <span className="text-sm text-ink-mid">

@@ -31,11 +31,11 @@ export default function PaymentForm({
         are fine — the balance just goes down by what was paid.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} />
 
         <Field label="Member" name="member_id" as="select"
           options={members.map((m) => ({

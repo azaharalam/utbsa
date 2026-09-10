@@ -35,8 +35,8 @@ export default function NewElection({
         removed while it is a draft — once announced, the list is fixed.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <div className="mb-4 rounded-lg border-2 border-dashed border-kantha bg-kantha-pale p-3">
         <p className="font-display text-base font-bold">{name}</p>
@@ -47,7 +47,7 @@ export default function NewElection({
       </div>
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} />
         <div className="grid gap-x-4 sm:grid-cols-2">
           <Field label="Nominations open" name="nominations_open_on" type="date" />
           <Field label="Nominations close" name="nominations_close_on" type="date" />

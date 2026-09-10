@@ -20,15 +20,15 @@ export default function ClaimRow({ claim }: { claim: any }) {
   const [rejectState, reject] = useFormState(rejectClaim, {});
   const [rejecting, setRejecting] = useState(false);
 
-  useCloseOnSuccess(rejectState.ok, () => setRejecting(false));
+  useCloseOnSuccess(rejectState?.ok, () => setRejecting(false));
 
   const pending = claim.status === 'pending';
-  const err = confirmState.error || rejectState.error;
+  const err = confirmState?.error || rejectState?.error;
 
   return (
     <Card>
       {err && <Notice tone="error">{err}</Notice>}
-      <Confirmation message={confirmState.ok ?? rejectState.ok} />
+      <Confirmation message={confirmState?.ok ?? rejectState?.ok} />
 
       {/* who */}
       <div className="flex items-start gap-3">

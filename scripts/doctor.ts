@@ -410,6 +410,24 @@ async function main() {
   else bad(`these forms discard errors: ${swallowing.join(', ')}`,
            'A failed action looks identical to a successful one.');
 
+  // A server action that times out returns undefined. Reading .error off it
+  // white-screens the whole page — a worse failure than the one that caused it.
+  const unguarded = clientFiles.filter((f: string) => {
+    const src = readFileSync(f, 'utf8');
+    if (!src.includes('useFormState')) return false;
+    return /\{\s*\w+State?\.(error|ok)\s/.test(src);
+  }).map((f: string) => f.replace(root + '/', ''));
+  if (!unguarded.length) ok('forms survive an action that returns nothing');
+  else bad(`these read form state without optional chaining: ${unguarded.join(', ')}`,
+           'A timed-out action white-screens the page. Use state?.error.');
+
+  // SMTP without timeouts hangs the request until nginx gives up at 60s.
+  const mailSrc = read('lib/mail.ts') ?? '';
+  if (mailSrc.includes('connectionTimeout')) ok('a stalled mail server fails fast');
+  else bad('SMTP has no timeouts',
+           'An unreachable mail host hangs the request until nginx returns 504.');
+
+
   /**
    * Every form must resolve when it succeeds.
    *

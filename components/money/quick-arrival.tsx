@@ -13,8 +13,8 @@ export default function QuickArrival({ arrivals }: { arrivals: ArrivalSummary[] 
 
   return (
     <div>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <div className="space-y-2">
         {open.map((a) => {

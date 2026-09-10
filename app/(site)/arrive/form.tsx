@@ -12,7 +12,7 @@ export default function ArrivalForm() {
 
   return (
     <Card>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
 
       <form action={action}>
         <Field label="Your name" name="full_name" required placeholder="Rafid Hossain" />

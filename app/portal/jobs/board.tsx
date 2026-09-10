@@ -24,7 +24,7 @@ export default function JobBoard({ posts, meId }: { posts: JobPost[]; meId: stri
   return (
     <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr] lg:items-start">
       <div>
-        {closeState.error && <Notice tone="error">{closeState.error}</Notice>}
+        {closeState?.error && <Notice tone="error">{closeState?.error}</Notice>}
 
         {posts.length ? (
           <div className="space-y-3">
@@ -74,11 +74,11 @@ export default function JobBoard({ posts, meId }: { posts: JobPost[]; meId: stri
           Only members see this board.
         </p>
 
-        {postState.error && <Notice tone="error">{postState.error}</Notice>}
-        <Confirmation message={postState.ok} />
+        {postState?.error && <Notice tone="error">{postState?.error}</Notice>}
+        <Confirmation message={postState?.ok} />
 
         <form action={post} ref={formRef}>
-          <ResetOnSuccess ok={postState.ok} formRef={formRef} />
+          <ResetOnSuccess ok={postState?.ok} formRef={formRef} />
           <Field label="Role" name="title" required placeholder="Software Engineer, new grad" />
           <Field label="Organisation" name="organisation" required placeholder="Owens Corning" />
           <div className="grid gap-x-4 sm:grid-cols-2">

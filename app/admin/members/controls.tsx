@@ -31,7 +31,7 @@ export default function MemberControls({
           ))}
         </select>
       </form>
-      {state.error && <p className="text-xs text-alta">{state.error}</p>}
+      {state?.error && <p className="text-xs text-alta">{state?.error}</p>}
     </div>
   );
 }

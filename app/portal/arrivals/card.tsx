@@ -18,9 +18,9 @@ export default function ArrivalCard({
   const [closeState, close] = useFormState(closeArrival, {});
   const [closing, setClosing] = useState(false);
 
-  useCloseOnSuccess(closeState.ok, () => setClosing(false));
+  useCloseOnSuccess(closeState?.ok, () => setClosing(false));
 
-  const err = claimState.error || relState.error || closeState.error;
+  const err = claimState?.error || relState?.error || closeState?.error;
   const needs = [
     summary.needs_pickup && 'lift from the airport',
     summary.needs_stay && 'somewhere to stay',

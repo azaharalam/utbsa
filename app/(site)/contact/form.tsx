@@ -14,7 +14,7 @@ export default function ContactForm() {
   const [state, action] = useFormState(sendMessage, {});
 
   // Nothing follows a sent message, so the form has no reason to stay.
-  if (state.ok) {
+  if (state?.ok) {
     return (
       <Done title="Message sent">
         <p className="text-sm text-ink-mid">
@@ -26,8 +26,8 @@ export default function ContactForm() {
 
   return (
     <Card>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
       <form action={action}>
         <Field label="Your name" name="name" required />
         <Field label="Email" name="email" type="email" required />

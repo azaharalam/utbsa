@@ -5,6 +5,17 @@ import nodemailer from 'nodemailer';
  * That means you can test the whole magic-link flow with no email provider
  * at all — copy the link out of the terminal and paste it in the browser.
  */
+/**
+ * Timeouts matter more than they look.
+ *
+ * Without them, a blocked or unreachable SMTP host makes sendMail hang, which
+ * hangs the server action, which hangs the request — until nginx gives up at
+ * 60 seconds and returns a 504. The person sees a broken page and no
+ * explanation, and the log says nothing useful.
+ *
+ * Ten seconds is far more than a healthy send needs, and turns a hang into a
+ * clear error the form can show.
+ */
 const transport =
   process.env.MAIL_TRANSPORT === 'smtp'
     ? nodemailer.createTransport({
@@ -12,6 +23,9 @@ const transport =
         port: Number(process.env.SMTP_PORT ?? 587),
         secure: Number(process.env.SMTP_PORT) === 465,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
       })
     : null;
 

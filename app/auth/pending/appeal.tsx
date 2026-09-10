@@ -18,7 +18,7 @@ export default function Appeal() {
   const [state, action] = useFormState(appeal, {});
   const [open, setOpen] = useState(false);
 
-  if (state.ok) {
+  if (state?.ok) {
     return (
       <Done title="Sent">
         <p className="text-sm text-ink-mid">
@@ -39,7 +39,7 @@ export default function Appeal() {
 
   return (
     <form action={action}>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
       <label htmlFor="appeal" className="mb-1.5 block text-xs font-semibold text-ink-mid">
         What would you like us to know?
       </label>

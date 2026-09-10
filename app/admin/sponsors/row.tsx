@@ -11,12 +11,12 @@ export default function SponsorRow({ sponsor }: { sponsor: any }) {
   const [state, action] = useFormState(saveSponsor, {});
   const [open, setOpen] = useState(false);
 
-  useCloseOnSuccess(state.ok, () => setOpen(false));
+  useCloseOnSuccess(state?.ok, () => setOpen(false));
 
   return (
     <Card>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      {state.ok && <Notice tone="success">{state.ok}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">

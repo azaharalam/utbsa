@@ -23,11 +23,11 @@ export default function EventForm() {
   return (
     <Card>
       <h2 className="mb-4 font-display text-lg font-bold">Add an event</h2>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} also={() => setSlug('')} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} also={() => setSlug('')} />
         <div className="mb-4">
           <label htmlFor="ev-title" className="mb-1.5 block text-xs font-semibold text-ink-mid">
             Title <span className="text-alta">*</span>

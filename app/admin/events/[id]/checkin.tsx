@@ -11,7 +11,7 @@ export default function CheckInList({ eventId, rsvps }: { eventId: string; rsvps
 
   return (
     <>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
       <p className="mb-3 text-sm text-ink-mid">
         {arrived} of {rsvps.length} arrived
       </p>

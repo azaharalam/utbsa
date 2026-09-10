@@ -27,7 +27,7 @@ export default function AssessPanel({
   const [rateState, setRate] = useFormState(setTermDues, {});
   const [confirming, setConfirming] = useState(false);
 
-  useCloseOnSuccess(assessState.ok, () => setConfirming(false));
+  useCloseOnSuccess(assessState?.ok, () => setConfirming(false));
 
   const years = yearOptions();
 
@@ -39,10 +39,10 @@ export default function AssessPanel({
         charged, and it can only run once per semester.
       </p>
 
-      {assessState.error && <Notice tone="error">{assessState.error}</Notice>}
-      <Confirmation message={assessState.ok} />
-      {rateState.error && <Notice tone="error">{rateState.error}</Notice>}
-      <Confirmation message={rateState.ok} />
+      {assessState?.error && <Notice tone="error">{assessState?.error}</Notice>}
+      <Confirmation message={assessState?.ok} />
+      {rateState?.error && <Notice tone="error">{rateState?.error}</Notice>}
+      <Confirmation message={rateState?.ok} />
 
       <div className="mb-4 rounded-lg border-2 border-dashed border-stitch bg-muslin p-4">
         <p className="font-display text-base font-bold">{current.term_name}</p>

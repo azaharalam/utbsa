@@ -25,9 +25,9 @@ export default function NominationList({
 
   return (
     <>
-      {addState.error && <Notice tone="error">{addState.error}</Notice>}
-      <Confirmation message={addState.ok} />
-      {decState.error && <Notice tone="error">{decState.error}</Notice>}
+      {addState?.error && <Notice tone="error">{addState?.error}</Notice>}
+      <Confirmation message={addState?.ok} />
+      {decState?.error && <Notice tone="error">{decState?.error}</Notice>}
 
       <div className="mb-4 space-y-2">
         {nominations.map((n) => (

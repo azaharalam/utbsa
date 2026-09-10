@@ -31,10 +31,10 @@ export default function HouseholdBox({
   const [leaveState, leave] = useFormState(leaveHousehold, {});
   const [open, setOpen] = useState(false);
 
-  useCloseOnSuccess(inviteState.ok, () => setOpen(false));
+  useCloseOnSuccess(inviteState?.ok, () => setOpen(false));
 
   const others = household.filter((h) => h.id !== meId);
-  const err = inviteState.error || respondState.error || cancelState.error || leaveState.error;
+  const err = inviteState?.error || respondState?.error || cancelState?.error || leaveState?.error;
 
   return (
     <Card className="mt-5">
@@ -46,9 +46,9 @@ export default function HouseholdBox({
       </p>
 
       {err && <Notice tone="error">{err}</Notice>}
-      {inviteState.ok && <Notice tone="success">{inviteState.ok}</Notice>}
-      {respondState.ok && <Notice tone="success">{respondState.ok}</Notice>}
-      {leaveState.ok && <Notice tone="info">{leaveState.ok}</Notice>}
+      {inviteState?.ok && <Notice tone="success">{inviteState?.ok}</Notice>}
+      {respondState?.ok && <Notice tone="success">{respondState?.ok}</Notice>}
+      {leaveState?.ok && <Notice tone="info">{leaveState?.ok}</Notice>}
 
       {incoming.map((i) => (
         <div key={i.id} className="mb-3 rounded-lg border-2 border-dashed border-kantha bg-kantha-pale p-3">

@@ -15,8 +15,8 @@ export default function SettingsForm({ settings }: { settings: Settings }) {
     <>
       <h1 className="mb-5 font-display text-2xl font-bold sm:text-3xl">Settings</h1>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <Card className="mb-5 max-w-xl">
         <h2 className="mb-1 font-display text-lg font-bold">Current session</h2>

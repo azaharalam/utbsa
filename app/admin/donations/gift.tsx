@@ -47,8 +47,8 @@ export default function Gift({ gift, funds }: {
   const [moveState, move] = useFormState(reassignDonationFund, {});
   const [note, setNote] = useState<string | null>(null);
 
-  const err = ackState.error || moveState.error;
-  const thanked = !!gift.acknowledged_at || !!ackState.ok;
+  const err = ackState?.error || moveState?.error;
+  const thanked = !!gift.acknowledged_at || !!ackState?.ok;
 
   return (
     <Card>
@@ -91,7 +91,7 @@ export default function Gift({ gift, funds }: {
           <FundSelect funds={funds} current={gift.fund_id} />
         </form>
 
-        {moveState.ok && <span className="text-xs text-kantha">moved</span>}
+        {moveState?.ok && <span className="text-xs text-kantha">moved</span>}
 
         <div className="ml-auto">
           {thanked ? (

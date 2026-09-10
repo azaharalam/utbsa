@@ -25,7 +25,7 @@ export default function HousingBoard({ posts, meId }: { posts: HousingPost[]; me
   return (
     <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr] lg:items-start">
       <div>
-        {closeState.error && <Notice tone="error">{closeState.error}</Notice>}
+        {closeState?.error && <Notice tone="error">{closeState?.error}</Notice>}
 
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={() => setFilter('all')}>
@@ -96,11 +96,11 @@ export default function HousingBoard({ posts, meId }: { posts: HousingPost[]; me
           Members can see your email if you have that switched on in your profile.
         </p>
 
-        {postState.error && <Notice tone="error">{postState.error}</Notice>}
-        <Confirmation message={postState.ok} />
+        {postState?.error && <Notice tone="error">{postState?.error}</Notice>}
+        <Confirmation message={postState?.ok} />
 
         <form action={post} ref={formRef}>
-          <ResetOnSuccess ok={postState.ok} formRef={formRef} />
+          <ResetOnSuccess ok={postState?.ok} formRef={formRef} />
           <Field label="What" name="kind" as="select" options={KINDS} />
           <Field label="Title" name="title" required
             placeholder="Room in a 2-bed near campus" />

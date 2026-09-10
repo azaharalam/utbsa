@@ -22,11 +22,11 @@ export default function ExpenseForm({ funds }: { funds: { id: string; name: stri
         with an offsetting entry, so the history stays honest.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} />
 
         <div className="grid gap-x-4 sm:grid-cols-2">
           <Field label="Amount" name="amount" placeholder="120.00" required />

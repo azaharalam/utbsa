@@ -28,7 +28,7 @@ export default function ClaimForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   // Nothing follows a sent message, so the form has no reason to stay.
-  if (state.ok) {
+  if (state?.ok) {
     return (
       <Done title="Thank you">
         <p className="text-sm text-ink-mid">
@@ -74,11 +74,11 @@ export default function ClaimForm({
           )}
         </div>
 
-        {state.error && <Notice tone="error">{state.error}</Notice>}
-        {state.ok && <Notice tone="success">{state.ok}</Notice>}
+        {state?.error && <Notice tone="error">{state?.error}</Notice>}
+        {state?.ok && <Notice tone="success">{state?.ok}</Notice>}
 
         <form action={action} ref={formRef}>
-          <Clear ok={state.ok} formRef={formRef} />
+          <Clear ok={state?.ok} formRef={formRef} />
           <input type="hidden" name="via" value={via} />
           {token && <input type="hidden" name="token" value={token} />}
 

@@ -11,7 +11,7 @@ export default function RequestRow({ req }: { req: StatusRequest }) {
 
   return (
     <Card>
-      {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-4">

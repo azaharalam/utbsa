@@ -30,7 +30,7 @@ function PhotoUpload({ member }: { member: Member }) {
     const res = await fetch('/api/upload', { method: 'POST', body });
     const json = await res.json();
 
-    if (!res.ok) { setErr(json.error ?? 'Upload failed.'); setBusy(false); return; }
+    if (!res.ok) { setErr(json?.error ?? 'Upload failed.'); setBusy(false); return; }
     setUrl(json.url);
     setBusy(false);
     router.refresh();
@@ -72,8 +72,8 @@ export default function ProfileForm({
 
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <Card>
-          {pState.error && <Notice tone="error">{pState.error}</Notice>}
-          <Confirmation message={pState.ok} />
+          {pState?.error && <Notice tone="error">{pState?.error}</Notice>}
+          <Confirmation message={pState?.ok} />
 
           <PhotoUpload member={member} />
 
@@ -150,8 +150,8 @@ export default function ProfileForm({
           <p className="mb-3 text-sm text-ink-mid">
             Nothing here is ever public. These control what other signed-in members see.
           </p>
-          {vState.error && <Notice tone="error">{vState.error}</Notice>}
-          <Confirmation message={vState.ok} />
+          {vState?.error && <Notice tone="error">{vState?.error}</Notice>}
+          <Confirmation message={vState?.ok} />
 
           <form action={vAction}>
             <Toggle label="Show my email" name="show_email" defaultChecked={member.show_email} />

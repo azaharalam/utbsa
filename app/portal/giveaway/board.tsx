@@ -30,9 +30,9 @@ export default function GiveawayBoard({ items, meId }: { items: GiveawayItem[]; 
   return (
     <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr] lg:items-start">
       <div>
-        {claimState.error && <Notice tone="error">{claimState.error}</Notice>}
-        <Confirmation message={claimState.ok} />
-        {statusState.error && <Notice tone="error">{statusState.error}</Notice>}
+        {claimState?.error && <Notice tone="error">{claimState?.error}</Notice>}
+        <Confirmation message={claimState?.ok} />
+        {statusState?.error && <Notice tone="error">{statusState?.error}</Notice>}
 
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={() => setFilter('all')}>
@@ -103,11 +103,11 @@ export default function GiveawayBoard({ items, meId }: { items: GiveawayItem[]; 
           Whoever claims it arranges collection with you directly.
         </p>
 
-        {postState.error && <Notice tone="error">{postState.error}</Notice>}
-        <Confirmation message={postState.ok} />
+        {postState?.error && <Notice tone="error">{postState?.error}</Notice>}
+        <Confirmation message={postState?.ok} />
 
         <form action={post} ref={formRef}>
-          <ResetOnSuccess ok={postState.ok} formRef={formRef} />
+          <ResetOnSuccess ok={postState?.ok} formRef={formRef} />
           <Field label="What is it" name="title" required placeholder="IKEA desk and chair" />
           <Field label="Category" name="category" as="select" options={CATEGORIES} />
           <div className="grid gap-x-4 sm:grid-cols-2">

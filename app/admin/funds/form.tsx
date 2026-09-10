@@ -34,11 +34,11 @@ export default function FundForm() {
         Usually one per major event, plus the standing ones.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} also={() => setWithGift(false)} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} also={() => setWithGift(false)} />
 
         <Field label="Name" name="name" required placeholder="Boishakh 1432" />
         <Field label="What it is for" name="description"

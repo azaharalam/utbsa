@@ -32,12 +32,12 @@ export default function TicketDesk({
         paying at the gate. Goes straight into the ledger as ticket income.
       </p>
 
-      {state.error && <Notice tone="error">{state.error}</Notice>}
-      <Confirmation message={state.ok} />
+      {state?.error && <Notice tone="error">{state?.error}</Notice>}
+      <Confirmation message={state?.ok} />
 
       <form action={action} ref={formRef}>
-        <ResetOnSuccess ok={state.ok} formRef={formRef} />
-        <Clear ok={state.ok} formRef={formRef} />
+        <ResetOnSuccess ok={state?.ok} formRef={formRef} />
+        <Clear ok={state?.ok} formRef={formRef} />
         <input type="hidden" name="event_id" value={eventId} />
 
         <Field label="Name" name="purchaser_name" placeholder="Walk-up" />
