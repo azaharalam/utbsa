@@ -124,6 +124,7 @@ async function main() {
     ['lib/audit-display.ts', 'audit diff formatting'],
     ['lib/calendar.ts', 'calendar links'],
     ['lib/bulk-mail.ts', 'resilient batch sending'],
+    ['scripts/make-officer.ts', 'first-officer bootstrap'],
     ['components/user-menu.tsx', 'account menu'],
     ['components/app-footer.tsx', 'in-app footer'],
     ['lib/queries/sponsors.ts', 'sponsors and financial summary'],
@@ -651,6 +652,20 @@ async function main() {
     const off = ballotMismatch.filter((r: any) => r.ballots !== r.voted);
     if (!off.length) ok('ballot count matches the number of members recorded as voting');
     else bad(`mismatch in: ${off.map((r: any) => r.name).join(', ')}`);
+
+    // The old db:admin set members.role, which grants nothing since 007.
+    // Anyone flagged that way but holding no office has no access at all.
+    const orphanAdmins = await sql<{ full_name: string }[]>`
+      select m.full_name from members m
+      where m.role = 'admin' and m.status = 'active'
+        and not exists (
+          select 1 from officer_roles o
+          where o.member_id = m.id and o.ended_at is null
+        )`;
+    if (!orphanAdmins.length) ok('nobody is flagged admin without an office');
+    else bad(`${orphanAdmins.map((r) => r.full_name).join(', ')} flagged admin but hold no office`,
+             'members.role grants nothing since migration 007. '
+             + 'npm run db:officer -- their@email "Title" full');
 
     // Nobody should be locked out of administering the site.
     const [{ n: fullOffices }] = await sql<{ n: string }[]>`

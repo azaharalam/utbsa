@@ -1,59 +1,67 @@
-# Scripts never read .env.production
+# Giving someone an office — and a bug this found
 
-**2 files.** This would have hit production exactly the same way.
+**3 files.**
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-envfix/. .
-git add -A && git commit -m "scripts read .env.production" && git push
+cp -r ~/Downloads/utbsa-officer/. .
+git add -A && git commit -m "db:officer replaces db:admin" && git push
 ```
 
-Then on the droplet:
+Then on staging:
 
 ```bash
-cd /srv/utbsa-staging
-git pull
-npm run db:migrate
-npm run db:seed
-npm run db:demo
-npm run doctor
+cd /srv/utbsa-staging && git pull
+npm run db:officer -- azaharalam2233@gmail.com "General Secretary" full \
+  --name "Md. Azahar Alam" --phone "419 246 7235"
 ```
 
 ---
 
-## What happened
+## The bug
 
-`scripts/env.ts` loaded only `.env.local`. On the droplet that file does not
-exist, so `DATABASE_URL` was never set — and `postgres` fell back to its
-default, which is *connect as the current OS user*. Hence:
+**`npm run db:admin` had stopped working.** It set `role = 'admin'`, and since
+migration 007 that column grants nothing — access comes from the office
+someone holds.
 
+So it ran, printed "is now an active admin", and left the person with no access
+at all. You would have hit this creating the first admin on production, with a
+success message telling you it had worked.
+
+## The replacement
+
+```bash
+npm run db:officer -- <email> "<Office title>" <access> [--name "..."] [--phone "..."]
 ```
-password authentication failed for user "deploy"
-```
 
-Which sounds like a Postgres problem and is actually a file that was never
-read. The doctor made it worse by telling you to
-`sudo systemctl start postgresql`, when Postgres was running perfectly.
+| Access | Grants |
+|---|---|
+| `full` | everything, including assigning offices |
+| `money` | dues, transfers, donations, funds, ledger |
+| `members` | approvals, member records, posts, events |
+| `content` | posts and events |
+| `events` | events only |
+| `none` | listed publicly, no admin access |
 
-The build worked because **Next.js loads `.env.production` itself**. Only the
-standalone scripts were blind to it.
+It finds the member by **any** of their addresses, activates and approves them,
+and assigns the office for the current session. With `--name` it creates the
+member if they do not exist — which is how the first officer gets in on a fresh
+database, when there is nobody to do it from the admin UI.
 
-## Fixed
+Reassigning **ends** the previous office rather than stacking permissions, and
+the old one stays in the history.
 
-`scripts/env.ts` now looks for `.env.local`, then `.env.production`, then
-`.env` — first definition wins, mirroring Next's own order. Your laptop keeps
-using `.env.local`; the droplet picks up `.env.production`.
+It warns when fewer than two offices hold full access.
 
-If no `DATABASE_URL` is found it now says so, listing which files it looked for
-and which it found, instead of failing later with a misleading Postgres error.
+`db:admin` still works as an alias, so anything referencing it keeps running.
 
-`DEBUG_ENV=1 npm run doctor` prints which file was loaded.
+## Two doctor checks
 
-The doctor also distinguishes a wrong password from a stopped server, rather
-than suggesting the same fix for both.
+- **nobody is flagged admin without an office** — catches exactly the state the
+  old script left people in
+- **first-officer bootstrap** — the script is present
 
-## About the font warnings
+## After that
 
-Ignore them. The build retried and succeeded — `✓ Compiled successfully` and
-all 49 routes. Next caches the fonts after the first successful fetch, so
-later builds will not even try.
+Assign offices from `/admin/offices` rather than the command line, so the
+change is recorded in the audit log with who did it.
