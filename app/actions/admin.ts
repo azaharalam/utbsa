@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/session';
 import * as Members from '@/lib/queries/members';
 import * as Content from '@/lib/queries/content';
+import * as Potluck from '@/lib/queries/potluck';
 import { sendMail, approvalEmail } from '@/lib/mail';
 import { audit } from '@/lib/audit';
 import type { MemberStatus } from '@/lib/types';
@@ -120,9 +121,35 @@ export async function saveEvent(_prev: FormState, fd: FormData): Promise<FormSta
     });
 
     await audit(me.id, 'event.save', 'event', id, { slug });
+
+    // The dish list was filled in on the same form. It can only be written
+    // once the event exists, so it happens here rather than in saveEvent.
+    // Blank rows are skipped — somebody adding a row and changing their mind
+    // should not produce a nameless dish.
+    let dishesAdded = 0;
+    if (fd.get('is_potluck') === 'on') {
+      const count = Number(fd.get('dish_count') ?? 0);
+      for (let i = 0; i < count; i++) {
+        const dish = String(fd.get(`dish_name_${i}`) ?? '').trim();
+        if (!dish) continue;
+        const ids = await Potluck.addItems(me, {
+          eventId: id,
+          category: String(fd.get(`dish_category_${i}`) ?? 'rice'),
+          dish,
+          covers: Number(fd.get(`dish_covers_${i}`) ?? 15),
+          splitInto: Number(fd.get(`dish_split_${i}`) ?? 1),
+        });
+        dishesAdded += ids.length;
+      }
+    }
+
     revalidatePath('/admin/events');
     revalidatePath('/events');
-    return { ok: 'Saved.' };
+    return {
+      ok: dishesAdded
+        ? `Saved, with ${dishesAdded} dish${dishesAdded === 1 ? '' : 'es'} on the list.`
+        : 'Saved.',
+    };
   } catch (e) {
     const msg = (e as Error).message;
     if (msg.includes('events_slug_key')) return { error: 'Another event already uses that URL.' };

@@ -59,7 +59,9 @@ export default async function EventPage({ params }: { params: { slug: string } }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <Link href="/events" className="mb-6 inline-block text-sm text-kantha">← All events</Link>
+      {/* Back to where they came from: the portal list if signed in. */}
+      <Link href={me ? '/portal/events' : '/events'}
+        className="mb-6 inline-block text-sm text-kantha">← All events</Link>
 
       {isPast && <div className="mb-4"><Pill tone="grey">This event has passed</Pill></div>}
       {!isPast && !canRsvp && (

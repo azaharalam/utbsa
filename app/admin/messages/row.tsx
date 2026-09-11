@@ -6,6 +6,8 @@ import { Card, Pill, Notice } from '@/components/ui';
 import type { Message } from '@/lib/queries/inbox';
 
 export default function MessageRow({ message }: { message: Message }) {
+  // Say why it was filtered, so a mistake is obvious at a glance.
+  const filtered = message.spam_score >= 4;
   const [state, action] = useFormState(setMessageHandled, {});
 
   return (
@@ -17,7 +19,10 @@ export default function MessageRow({ message }: { message: Message }) {
           <p className="text-sm font-semibold">
             A rejected applicant asking to be reconsidered
           </p>
-          <p className="text-xs text-ink-mid">
+          {filtered && message.spam_reasons && (
+        <p className="mb-1 text-xs text-alta">Filtered — {message.spam_reasons}</p>
+      )}
+      <p className="text-xs text-ink-mid">
             Their account is still there. To let them in, set their status back to
             pending or active at{' '}
             <a href="/admin/members?status=rejected" className="font-semibold text-kantha">

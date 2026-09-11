@@ -44,6 +44,8 @@ export default async function EventDetail({ params }: { params: { id: string } }
   const ticketRevenue = paid.reduce((s, o) => s + o.amount_cents, 0);
   const ticketPeople = paid.reduce((s, o) => s + o.qty_adult + o.qty_child, 0);
   const isPast = new Date(event.starts_at) < new Date();
+  // Ticking people off only makes sense once they can actually be arriving.
+  const hasStarted = isPast;
 
   return (
     <>
@@ -120,7 +122,7 @@ export default async function EventDetail({ params }: { params: { id: string } }
             they RSVP&apos;d — dietary needs, arriving late.
           </p>
           {rsvps.length ? (
-            <CheckInList eventId={event.id} rsvps={rsvps} />
+            <CheckInList eventId={event.id} rsvps={rsvps} started={hasStarted} />
           ) : (
             <Empty title="Nobody has RSVP'd yet"
               body="Members RSVP from the event page on the public site." />

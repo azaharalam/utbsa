@@ -93,11 +93,16 @@ export function Field({
   );
 }
 
-export function Toggle({ label, name, defaultChecked }: { label: string; name: string; defaultChecked: boolean }) {
+export function Toggle({ label, name, defaultChecked, onChange }: {
+  label: string; name: string; defaultChecked: boolean;
+  /** Optional — for a toggle that reveals more of the form. */
+  onChange?: (on: boolean) => void;
+}) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-4 border-b border-muslin-deep py-3 last:border-b-0">
       <span className="text-sm">{label}</span>
-      <input type="checkbox" name={name} defaultChecked={defaultChecked} className="peer sr-only" />
+      <input type="checkbox" name={name} defaultChecked={defaultChecked} className="peer sr-only"
+        onChange={onChange ? (e) => onChange(e.target.checked) : undefined} />
       <span className="relative h-6 w-11 shrink-0 rounded-full bg-[#C9C4B4] transition-colors peer-checked:bg-kantha peer-focus-visible:ring-2 peer-focus-visible:ring-genda">
         <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
       </span>

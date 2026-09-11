@@ -5,6 +5,9 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { saveEvent } from '@/app/actions/admin';
 import { Card, Field, Button, Notice, Toggle } from '@/components/ui';
 import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
+import { POTLUCK_CATEGORIES } from '@/lib/potluck';
+
+type Draft = { category: string; dish: string; covers: number; split: number };
 
 function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60);
@@ -19,6 +22,19 @@ export default function EventForm() {
   const [state, action] = useFormState(saveEvent, {});
   const [slug, setSlug] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+
+  // The dish list is built here rather than after saving, because creating an
+  // event and then immediately "editing" it to add dishes reads as though you
+  // did something wrong the first time.
+  const [isPotluck, setIsPotluck] = useState(false);
+  const [dishes, setDishes] = useState<Draft[]>([
+    { category: 'rice', dish: '', covers: 15, split: 1 },
+  ]);
+
+  const setDish = (i: number, patch: Partial<Draft>) =>
+    setDishes((d) => d.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  const cell = 'w-full rounded-lg border border-[#D6D1C2] bg-white px-2.5 py-2 text-sm';
 
   return (
     <Card>
@@ -65,13 +81,77 @@ export default function EventForm() {
         <div className="mb-4">
           <Toggle label="Visible to the public" name="is_public" defaultChecked={true} />
           <Toggle label="This is a potluck — members bring dishes"
-            name="is_potluck" defaultChecked={false} />
+            name="is_potluck" defaultChecked={isPotluck}
+            onChange={(on: boolean) => setIsPotluck(on)} />
           <Toggle label="This is a tournament — members register to play"
             name="is_tournament" defaultChecked={false} />
         </div>
 
+        {/* ── the dish list, while you are already here ───────── */}
+        {isPotluck && (
+          <div className="mb-4 rounded-lg border border-[#D6D1C2] p-3">
+            <p className="mb-1 text-sm font-semibold">What should people bring?</p>
+            <p className="mb-3 text-xs text-ink-mid">
+              Members pick from this list — they cannot add to it. Nobody cooks rice for
+              120, so put <strong>120</strong> and <strong>4 ways</strong> and you get four
+              rows of 30, each its own dish from then on. You can change all of it later.
+            </p>
+
+            {dishes.map((d, i) => (
+              <div key={i} className="mb-2 flex flex-wrap items-end gap-2">
+                <div className="w-32">
+                  <select value={d.category} className={cell}
+                    onChange={(e) => setDish(i, { category: e.target.value })}
+                    aria-label="Category">
+                    {POTLUCK_CATEGORIES.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-[10rem] flex-1">
+                  <input value={d.dish} placeholder="Beef tehari" className={cell}
+                    onChange={(e) => setDish(i, { dish: e.target.value })}
+                    aria-label="Dish" />
+                </div>
+                <div className="w-24">
+                  <input type="number" min={1} max={500} value={d.covers} className={cell}
+                    onChange={(e) => setDish(i, { covers: Number(e.target.value) })}
+                    aria-label="For how many" />
+                </div>
+                <div className="w-28">
+                  <select value={d.split} className={cell}
+                    onChange={(e) => setDish(i, { split: Number(e.target.value) })}
+                    aria-label="Split">
+                    {[1,2,3,4,5,6,8,10,12].map((n) => (
+                      <option key={n} value={n}>{n === 1 ? 'no split' : `${n} ways`}</option>
+                    ))}
+                  </select>
+                </div>
+                {dishes.length > 1 && (
+                  <button type="button" className="pb-2 text-xs text-clay"
+                    onClick={() => setDishes((rows) => rows.filter((_, n) => n !== i))}>
+                    remove
+                  </button>
+                )}
+                {/* Submitted as plain fields; the action reads them by index. */}
+                <input type="hidden" name={`dish_category_${i}`} value={d.category} />
+                <input type="hidden" name={`dish_name_${i}`} value={d.dish} />
+                <input type="hidden" name={`dish_covers_${i}`} value={d.covers} />
+                <input type="hidden" name={`dish_split_${i}`} value={d.split} />
+              </div>
+            ))}
+            <input type="hidden" name="dish_count" value={dishes.length} />
+
+            <button type="button"
+              className="mt-1 text-sm font-semibold text-kantha"
+              onClick={() => setDishes((d) => [...d, { category: 'rice', dish: '', covers: 15, split: 1 }])}>
+              + Another dish
+            </button>
+          </div>
+        )}
+
         <p className="mb-4 text-xs text-ink-mid">
-          Save the event first, then build the dish list or draw up the teams.
+          You can add teams, or more dishes, once the event is saved.
         </p>
 
         {/*

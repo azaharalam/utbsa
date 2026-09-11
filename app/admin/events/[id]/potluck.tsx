@@ -3,11 +3,11 @@
 import { useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
 import {
-  addPotluckItem, duplicatePotluckItem, updatePotluckItem, removePotluckItem,
+  addPotluckItem, updatePotluckItem, removePotluckItem,
 } from '@/app/actions/potluck';
 import { Card, Notice, Pill } from '@/components/ui';
 import { Submit } from '@/components/money/forms';
-import { ResetOnSuccess, Confirmation } from '@/components/money/form-result';
+import { ResetOnSuccess, Confirmation, useCloseOnSuccess } from '@/components/money/form-result';
 import { POTLUCK_CATEGORIES } from '@/lib/potluck';
 import type { PotluckItem } from '@/lib/queries/potluck';
 
@@ -29,13 +29,16 @@ export default function PotluckEditor({
   eventId: string; items: PotluckItem[]; expected: number;
 }) {
   const [addState, add] = useFormState(addPotluckItem, {});
-  const [dupState, duplicate] = useFormState(duplicatePotluckItem, {});
   const [editState, update] = useFormState(updatePotluckItem, {});
   const [rmState, remove] = useFormState(removePotluckItem, {});
   const [editing, setEditing] = useState<string | null>(null);
+
+  // Saving an edit left the row open, so it looked as though nothing had
+  // happened. Close it and go back to the list.
+  useCloseOnSuccess(editState?.ok, () => setEditing(null));
   const addRef = useRef<HTMLFormElement>(null);
 
-  const err = addState?.error || dupState?.error || editState?.error || rmState?.error;
+  const err = addState?.error || editState?.error || rmState?.error;
   const covers = items.reduce((s, i) => s + i.covers, 0);
   const claimed = items.filter((i) => i.claimed_by).length;
 
@@ -59,7 +62,6 @@ export default function PotluckEditor({
       </div>
 
       {err && <Notice tone="error">{err}</Notice>}
-      <Confirmation message={dupState?.ok} />
       <Confirmation message={addState?.ok} />
 
       <div className="overflow-x-auto">
@@ -67,10 +69,11 @@ export default function PotluckEditor({
           <thead>
             <tr className="border-b-2 border-dashed border-stitch">
               <th className="w-[16%] p-2 text-left text-xs font-semibold text-ink-mid">Category</th>
-              <th className="w-[34%] p-2 text-left text-xs font-semibold text-ink-mid">Dish</th>
-              <th className="w-[9%] p-2 text-left text-xs font-semibold text-ink-mid">Covers</th>
-              <th className="w-[21%] p-2 text-left text-xs font-semibold text-ink-mid">Note</th>
-              <th className="w-[20%] p-2 text-right text-xs font-semibold text-ink-mid">Who / actions</th>
+              <th className="w-[28%] p-2 text-left text-xs font-semibold text-ink-mid">Dish</th>
+              <th className="w-[8%] p-2 text-left text-xs font-semibold text-ink-mid">Feeds</th>
+              <th className="w-[18%] p-2 text-left text-xs font-semibold text-ink-mid">Note</th>
+              <th className="w-[17%] p-2 text-left text-xs font-semibold text-ink-mid">Who</th>
+              <th className="w-[13%] p-2 text-right text-xs font-semibold text-ink-mid">&nbsp;</th>
             </tr>
           </thead>
 
@@ -78,7 +81,7 @@ export default function PotluckEditor({
             {items.map((i) => (
               editing === i.id ? (
                 <tr key={i.id} className="border-b border-muslin-deep bg-kantha-pale/40">
-                  <td colSpan={5} className="p-2">
+                  <td colSpan={6} className="p-2">
                     <form action={update} className="flex flex-wrap items-end gap-2">
                       <input type="hidden" name="id" value={i.id} />
                       <input type="hidden" name="event_id" value={eventId} />
@@ -106,24 +109,27 @@ export default function PotluckEditor({
                   <td className="p-2 font-semibold">{i.dish}</td>
                   <td className="p-2 tabular-nums">{i.covers}</td>
                   <td className="p-2 text-xs text-ink-mid">{i.note}</td>
+
+                  {/* Who has it, in its own column — a name and a row of buttons
+                      fighting for the same cell is what was breaking the layout. */}
                   <td className="p-2">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      {i.claimed_by_name && (
-                        <span className="text-xs text-kantha">{i.claimed_by_name}</span>
-                      )}
-                      <form action={duplicate}>
-                        <input type="hidden" name="id" value={i.id} />
-                        <input type="hidden" name="event_id" value={eventId} />
-                        <button type="submit"
+                    {i.claimed_by_name
+                      ? <span className="text-xs font-semibold text-kantha">{i.claimed_by_name}</span>
+                      : <span className="text-xs text-ink-mid">—</span>}
+                  </td>
+
+                  {/* Nothing to do to a dish somebody has already offered to
+                      bring. Edit and Delete would both change what they agreed
+                      to, so they are simply absent. */}
+                  <td className="p-2">
+                    {i.claimed_by ? (
+                      <span className="block text-right text-xs text-ink-mid">taken</span>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button onClick={() => setEditing(i.id)}
                           className="rounded-lg border border-[#D6D1C2] px-2 py-1 text-xs font-semibold hover:border-kantha hover:text-kantha">
-                          Copy
+                          Edit
                         </button>
-                      </form>
-                      <button onClick={() => setEditing(i.id)}
-                        className="rounded-lg border border-[#D6D1C2] px-2 py-1 text-xs font-semibold hover:border-kantha hover:text-kantha">
-                        Edit
-                      </button>
-                      {!i.claimed_by && (
                         <form action={remove}>
                           <input type="hidden" name="id" value={i.id} />
                           <input type="hidden" name="event_id" value={eventId} />
@@ -131,8 +137,8 @@ export default function PotluckEditor({
                             ✕
                           </button>
                         </form>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )
@@ -140,7 +146,7 @@ export default function PotluckEditor({
 
             {/* The add row sits in the table so the columns line up with it. */}
             <tr className="border-t-2 border-dashed border-stitch">
-              <td colSpan={5} className="pt-3">
+              <td colSpan={6} className="pt-3">
                 <form action={add} ref={addRef} className="flex flex-wrap items-end gap-2">
                   <ResetOnSuccess ok={addState?.ok} formRef={addRef} />
                   <input type="hidden" name="event_id" value={eventId} />
@@ -185,8 +191,8 @@ export default function PotluckEditor({
 
       {!items.length && (
         <p className="mt-3 text-sm text-ink-mid">
-          Nothing on the list yet. Add the first dish above, then use Copy to split
-          it between several cooks.
+          Nothing on the list yet. Add the first dish above — set how many it feeds
+          and how many ways to split it, and the portions appear as separate dishes.
         </p>
       )}
     </Card>

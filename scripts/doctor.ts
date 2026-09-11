@@ -76,6 +76,15 @@ async function main() {
     else bad(`${k} is missing`, `Add ${k} to .env.local`);
   }
 
+  // A scheme-less value produces links like `localhost:3000/auth/verify?...`
+  // which no mail client linkifies and NextResponse.redirect refuses. The
+  // failure is silent and looks like broken sign-in.
+  const siteRaw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (siteRaw && !/^https?:\/\//i.test(siteRaw)) {
+    bad(`NEXT_PUBLIC_SITE_URL has no http:// or https:// — "${siteRaw}"`,
+        'Every sign-in link is built from this. Without a scheme it is not a URL.');
+  }
+
   const secret = process.env.SESSION_SECRET ?? '';
   if (secret.length < 32 || secret.startsWith('change_me')) {
     bad('SESSION_SECRET is weak or still the placeholder',
@@ -421,6 +430,25 @@ async function main() {
   if (!swallowing.length) ok('no form throws away its error state');
   else bad(`these forms discard errors: ${swallowing.join(', ')}`,
            'A failed action looks identical to a successful one.');
+
+  // A form gated behind an "editing" or "open" state must clear it when the
+  // action succeeds. Leaving the panel open makes a successful save look like
+  // it did nothing — which is how the potluck editor behaved.
+  const stuckPanels = clientFiles.filter((f: string) => {
+    const src = readFileSync(f, 'utf8');
+    if (!src.includes('useFormState')) return false;
+    // A call, not merely the import — removing the call but leaving the
+    // import is exactly how this regresses.
+    if (/useCloseOnSuccess\s*\(/.test(src)) return false;
+    // <Done> replaces the whole panel, so it resolves too.
+    if (/<Done\b/.test(src)) return false;
+    const gates = src.match(/const \[(\w*(?:[Ee]dit|[Oo]pen|[Ss]how|[Ee]xpand|[Pp]anel)\w*), set\w+\] = useState/g);
+    return Boolean(gates?.length);
+  }).map((f: string) => f.replace(root + '/', ''));
+
+  if (!stuckPanels.length) ok('panels close themselves once their action succeeds');
+  else bad(`these leave a panel open after a successful save: ${stuckPanels.join(', ')}`,
+           'useCloseOnSuccess(state?.ok, () => setEditing(null))');
 
   // A server action that times out returns undefined. Reading .error off it
   // white-screens the whole page — a worse failure than the one that caused it.

@@ -224,10 +224,15 @@ export async function removeOfficer(actor: Member, id: string) {
 }
 
 // ───────────────────────── contact ─────────────────────────
-export async function saveMessage(m: { name: string; email: string; subject: string | null; message: string }) {
+export async function saveMessage(m: {
+  name: string; email: string; subject: string | null; message: string;
+  spamScore?: number; spamReasons?: string | null; senderIp?: string | null;
+}) {
   await sql`
-    insert into contact_messages (name, email, subject, message)
-    values (${m.name}, ${m.email}, ${m.subject}, ${m.message})
+    insert into contact_messages
+      (name, email, subject, message, spam_score, spam_reasons, sender_ip)
+    values (${m.name}, ${m.email}, ${m.subject}, ${m.message},
+            ${m.spamScore ?? 0}, ${m.spamReasons ?? null}, ${m.senderIp ?? null})
   `;
 }
 

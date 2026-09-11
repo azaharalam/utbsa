@@ -3,6 +3,7 @@ import { sql } from '@/lib/db';
 import { audit } from '@/lib/audit';
 import { can } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
+import { SPAM_THRESHOLD } from '@/lib/spam';
 
 async function assertMembers(actor: Member) {
   if (actor.status !== 'active' || !(await can(actor.id, 'members'))) {
@@ -16,9 +17,21 @@ export type Message = {
   subject: string | null; message: string;
   handled: boolean; handled_by_name: string | null;
   handled_at: string | null; created_at: string;
+  spam_score: number; spam_reasons: string | null;
 };
 
-export async function messages(actor: Member, showHandled = false): Promise<Message[]> {
+/**
+ * Scored messages are hidden from the main list, not deleted.
+ *
+ * A scoring mistake that hides a real member's message costs somebody a week.
+ * One that deletes it costs a member who wrote to the e-board, heard nothing,
+ * and will not write again. So: quarantine, visible under "Filtered".
+ */
+export async function messages(
+  actor: Member,
+  showHandled = false,
+  showSpam = false,
+): Promise<Message[]> {
   await assertMembers(actor);
   return sql<Message[]>`
     select c.*, m.full_name as handled_by_name, sub.status as member_status
@@ -26,9 +39,20 @@ export async function messages(actor: Member, showHandled = false): Promise<Mess
     left join members m on m.id = c.handled_by
     left join members sub on sub.id = c.member_id
     where (${showHandled} or not c.handled)
+      and (${showSpam} or c.spam_score < ${SPAM_THRESHOLD})
     order by c.created_at desc
     limit 200
   `;
+}
+
+/** How many are sitting in the filtered list, so the tab can say so. */
+export async function filteredCount(actor: Member): Promise<number> {
+  await assertMembers(actor);
+  const [row] = await sql<{ n: string }[]>`
+    select count(*)::text n from contact_messages
+    where spam_score >= ${SPAM_THRESHOLD} and not handled
+  `;
+  return Number(row?.n ?? 0);
 }
 
 export async function setHandled(actor: Member, id: string, handled: boolean) {

@@ -82,12 +82,6 @@ export default function CheckEmail({
           {typed && <> — not to {typed}</>}.
         </p>
 
-        <p className="mb-4 rounded-lg border-2 border-dashed border-kantha bg-kantha-pale px-4 py-3 text-sm">
-          The university holds back email from addresses it does not recognise, and ours is
-          new. Your UToledo address still works for signing in — we just cannot reliably
-          deliver to it, so we write to your personal one instead.
-        </p>
-
         <p className="text-xs text-ink-mid">
           Wrong address? Change it under{' '}
           <Link href="/portal/profile" className="font-semibold text-kantha">My profile</Link>{' '}

@@ -1,8 +1,15 @@
 import ContactForm from './form';
+import { formStamp } from '@/app/actions/contact';
+
+// The stamp must be generated per request. A cached page would serve everyone
+// the same timestamp, and after a few minutes every real submission would look
+// slow rather than fast — harmless — but a cached OLD stamp is also a stamp an
+// attacker gets for free, so keep it fresh.
+export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Contact' };
 
-export default function Contact() {
+export default async function Contact() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
       <h1 className="mb-2 font-display text-3xl font-bold sm:text-4xl">Contact us</h1>
@@ -11,7 +18,7 @@ export default function Contact() {
       </p>
 
       <div className="grid gap-8 md:grid-cols-2">
-        <ContactForm />
+        <ContactForm stamp={await formStamp()} />
         <div className="space-y-5 text-sm">
           <div>
             <h2 className="mb-1 font-display text-base font-bold">Email</h2>

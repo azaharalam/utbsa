@@ -5,7 +5,19 @@ import { checkInRsvp } from '@/app/actions/inbox';
 import { Card, Pill, Avatar, Notice } from '@/components/ui';
 import type { HouseholdRsvp } from '@/lib/queries/tickets';
 
-export default function CheckInList({ eventId, rsvps }: { eventId: string; rsvps: HouseholdRsvp[] }) {
+/**
+ * `started` gates the Arrived buttons.
+ *
+ * Before the event there is nobody to tick off, and a row of live buttons
+ * next to every name is an invitation to tap one by accident — at which point
+ * the list says somebody is here who is still at home, and the only way back
+ * is the database.
+ */
+export default function CheckInList({
+  eventId, rsvps, started = true,
+}: {
+  eventId: string; rsvps: HouseholdRsvp[]; started?: boolean;
+}) {
   const [state, action] = useFormState(checkInRsvp, {});
   const arrived = rsvps.filter((r) => r.checked_in_at).length;
 
@@ -13,7 +25,9 @@ export default function CheckInList({ eventId, rsvps }: { eventId: string; rsvps
     <>
       {state?.error && <Notice tone="error">{state?.error}</Notice>}
       <p className="mb-3 text-sm text-ink-mid">
-        {arrived} of {rsvps.length} arrived
+        {started
+          ? `${arrived} of ${rsvps.length} arrived`
+          : `${rsvps.length} expected — you can tick people off once it starts`}
       </p>
 
       <div className="space-y-2">
@@ -34,7 +48,7 @@ export default function CheckInList({ eventId, rsvps }: { eventId: string; rsvps
 
               {r.checked_in_at ? (
                 <Pill tone="green">here</Pill>
-              ) : (
+              ) : !started ? null : (
                 <form action={action}>
                   <input type="hidden" name="id" value={r.id} />
                   <input type="hidden" name="event_id" value={eventId} />
