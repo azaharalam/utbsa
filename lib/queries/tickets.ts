@@ -333,11 +333,7 @@ export async function decideStatusRequest(
       // address, since the university one is about to stop working.
       await tx`
         update members
-        set email = case
-          when member_type = 'student'
-            then coalesce(university_email, personal_email, email)
-          else coalesce(personal_email, university_email, email)
-        end
+        set email = coalesce(personal_email, university_email, email)
         where id = ${req.member_id}
       `;
     }

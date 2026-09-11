@@ -47,11 +47,10 @@ export async function createPending(input: {
   university_email?: string | null; personal_email?: string | null;
   phone?: string | null; heard_from?: string | null;
 }): Promise<Member> {
-  // `email` is the address we send to, derived from type — students get the
-  // university one while it still works, everyone else the personal one.
-  const contact = input.member_type === 'student'
-    ? (input.university_email ?? input.personal_email)
-    : (input.personal_email ?? input.university_email);
+  // `email` is the address we WRITE to, and it is the personal one for
+  // everybody. The university quarantines mail from an unfamiliar domain, so
+  // a sign-in link sent to a @rockets address never arrives.
+  const contact = input.personal_email ?? input.university_email;
 
   if (!contact) throw new Error('An email address is required.');
 
@@ -84,11 +83,7 @@ export async function adminUpdateMember(
 export async function refreshContactEmail(memberId: string) {
   await sql`
     update members
-    set email = case
-      when member_type = 'student'
-        then coalesce(university_email, personal_email, email)
-      else coalesce(personal_email, university_email, email)
-    end
+    set email = coalesce(personal_email, university_email, email)
     where id = ${memberId}
   `;
 }

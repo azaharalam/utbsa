@@ -1,44 +1,73 @@
-# Doctor reported a false failure
+# Write to personal addresses, and fix the check-email page
 
-**1 file.**
+**6 files, one migration.** The first part is a launch blocker.
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-docfix/. .
-git add -A && git commit -m "fix dangling else in the mail check" && git push
+cp -r ~/Downloads/utbsa-personal/. .
+npm run build
+git add -A && git commit -m "write to personal addresses" && git push
 ```
 
-Then on the droplet:
+Then on the droplet, **staging first**:
 
 ```bash
-cd /srv/utbsa && git pull && npm run doctor
-cd /srv/utbsa-staging && git pull && npm run doctor
+cd /srv/utbsa-staging && git pull && npm ci && npm run build \
+  && npm run db:migrate && npm run doctor && sudo systemctl restart utbsa-staging
+
+cd /srv/utbsa && git pull && npm ci && npm run build \
+  && npm run db:migrate && npm run doctor && sudo systemctl restart utbsa
 ```
 
 ---
 
-## What it was
+## 1. The blocker
 
-```
-✓ email is configured to send
-✗ MAIL_TRANSPORT is not smtp in production
-```
+Your rockets messages were in **quarantine**, not the inbox. You only saw them
+because you went looking; a member never would.
 
-Both cannot be true. A patch of mine inserted the SMTP-port check **between**
-an `if` and its `else`, so the `else` stopped belonging to the transport check
-and started belonging to the port check.
+Brevo reports "Delivered" because UToledo's server accepted the message — and
+then held it. Nothing bounces, nothing is logged, nothing arrives.
 
-Port 2525 is not 587 or 465, so the `else` fired and reported the wrong thing.
-Your configuration was correct the whole time.
+Every student's contact address was a rockets address. So on Friday: students
+sign up, the confirmation is quarantined, and they cannot get in. They would
+not report it — they would assume the site was broken.
 
-A dangling else, caused by editing code with string replacement instead of
-reading the surrounding lines. Fixed and verified against all three cases:
+**Now the app writes to the personal address for everyone.** Gmail delivered
+to the inbox and was opened tonight, so it works today.
 
-| Config | Result |
-|---|---|
-| smtp on 2525 | ✓ configured, no warning |
-| smtp on 587 | ✓ configured, **plus** a warning that DigitalOcean blocks it |
-| console | ✗ fails, as it should |
+The migration updates existing members, including all nine officers — without
+it, the change would only affect people who join later and you would all still
+be quarantined tomorrow.
 
-The port warning now also covers 25, and names both alternates — 2587 for SES,
-2525 for Brevo.
+**Both addresses still sign you in.** `findByEmail` matches `email`,
+`university_email`, or `personal_email`. This changes where we write, not who
+can get in. Verified with both of your addresses.
+
+A doctor check now fails if any active member is written to at a
+non-personal address.
+
+### Still worth doing
+
+Have your president ask UToledo IT to allow `utoledobsa.org` — valid SPF,
+DKIM and DMARC, transactional mail only, to students who signed up themselves.
+Slow, but it is the proper fix, and it would let rockets addresses work again.
+
+## 2. The check-email page
+
+Before, a non-member saw *"We sent a link to aa@yopmail.com"* — a flat claim
+that was untrue, and a dead end.
+
+It now says *"If there is a UTBSA account for that address, a link is on its
+way"*, then a clear second section: **Not a member yet?** with Join, Try
+another address, Contact us, and Home.
+
+The ambiguity is kept on purpose — naming which addresses have accounts would
+turn the form into a membership lookup — but it no longer lies, and it no
+longer strands anyone.
+
+**The `MAIL_TRANSPORT=console` note is gone.** Developer instructions on a
+page members see. A doctor check now greps for that pattern outside `/admin`.
+
+Both pages also mention the spam folder, and ask people to mark it not-spam —
+which is the fastest way to build the domain's reputation.

@@ -534,6 +534,19 @@ async function main() {
   if (perms.includes('PERMISSION_SETS')) ok('access derives from held office, not an account flag');
   else bad('lib/permissions.ts is missing the permission sets');
 
+  // Developer instructions have no business on a page members see.
+  const devLeaks = walk(join(root, 'app'))
+    .filter((f: string) => f.endsWith('.tsx'))
+    .filter((f: string) => {
+      if (f.includes('/admin/')) return false;
+      const src = readFileSync(f, 'utf8');
+      return /MAIL_TRANSPORT=console|npm run dev/.test(src);
+    })
+    .map((f: string) => f.replace(root + '/', ''));
+  if (!devLeaks.length) ok('no member-facing page mentions running it locally');
+  else bad(`development instructions shown to members: ${Array.from(new Set(devLeaks)).join(', ')}`);
+
+
   const mid = read('middleware.ts');
   if (mid && /from '@\/lib\/db'|postgres\(/.test(mid)) {
     bad('middleware.ts opens a database connection',
@@ -555,7 +568,7 @@ async function main() {
     for (const m of ['001_init.sql', '002_arrival_semester.sql', '003_drop_program.sql',
                      '004_money.sql', '005_drop_households.sql',
                      '006_payment_claims.sql', '007_elections.sql',
-                     '008_sessions.sql', '009_inbox.sql', '010_arrivals.sql', '011_audit_role.sql', '012_emails.sql', '013_sponsors.sql', '014_households_potluck.sql', '015_audit_scope.sql', '016_audit_diff.sql', '017_donor_student.sql', '018_appeals.sql']) {
+                     '008_sessions.sql', '009_inbox.sql', '010_arrivals.sql', '011_audit_role.sql', '012_emails.sql', '013_sponsors.sql', '014_households_potluck.sql', '015_audit_scope.sql', '016_audit_diff.sql', '017_donor_student.sql', '018_appeals.sql', '019_contact_personal.sql']) {
       if (applied.includes(m)) ok(`migration ${m}`);
       else bad(`migration ${m} has not run`, 'npm run db:migrate');
     }
@@ -796,6 +809,17 @@ async function main() {
     if (Number(roleless) === 0) ok('audit entries record the office held at the time');
     else bad(`${roleless} recent entries have no office recorded`,
              'lib/audit.ts must snapshot the actor\'s office when it writes.');
+
+    // A rockets address in the `email` column means their sign-in link goes
+    // somewhere the university quarantines — they simply cannot get in.
+    const [{ n: writingToUniversity }] = await sql<{ n: string }[]>`
+      select count(*)::text n from members
+      where status = 'active' and personal_email is not null
+        and lower(email) <> lower(personal_email)`;
+    if (Number(writingToUniversity) === 0) ok('every member is written to at their personal address');
+    else bad(`${writingToUniversity} members are written to at a non-personal address`,
+             'The university quarantines mail from new domains, so their sign-in '
+             + 'link never arrives. npm run db:migrate');
 
     // Students and alumni must be reachable after they leave.
     const unreachable = await sql<any[]>`

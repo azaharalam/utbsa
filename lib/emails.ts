@@ -28,13 +28,24 @@ export function needsUniversityEmail(joiningAs: JoiningAs) {
 }
 
 /**
- * Which address we SEND to. Derived from member type rather than stored as a
- * choice, so it changes by itself the moment a student becomes an alum.
+ * Which address we SEND to.
+ *
+ * Personal, for everybody — including students.
+ *
+ * We used to write to a student's @rockets.utoledo.edu address while it still
+ * worked. It does not work in practice: the university quarantines mail from
+ * a domain it has not seen before, and the message never reaches the inbox.
+ * The member sees nothing, reports nothing, and concludes the site is broken.
+ * On a site where the sign-in link IS the password, that is fatal.
+ *
+ * The personal address also outlives the degree, which is why we require one.
+ *
+ * The university address still signs them in — see findByEmail. This governs
+ * where we write, not who can get in.
  */
 export function contactEmail(m: {
   member_type: string; university_email: string | null; personal_email: string | null;
 }): string | null {
-  if (m.member_type === 'student') return m.university_email ?? m.personal_email;
   return m.personal_email ?? m.university_email;
 }
 
