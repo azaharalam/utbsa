@@ -360,14 +360,21 @@ async function main() {
     else bad(`NEXT_PUBLIC_SITE_URL is "${url}"`,
              'Every magic link is built from this. Wrong here means nobody can sign in.');
 
-    if (process.env.MAIL_TRANSPORT === 'smtp') ok('email is configured to send');
-    if (process.env.SMTP_PORT === '587' || process.env.SMTP_PORT === '465') {
+    if (process.env.MAIL_TRANSPORT === 'smtp') {
+      ok('email is configured to send');
+    } else {
+      bad('MAIL_TRANSPORT is not smtp in production',
+          'The site will work perfectly and nobody will receive anything.');
+    }
+
+    // DigitalOcean blocks the well-known submission ports on every Droplet.
+    // SES also listens on 2587, Brevo on 2525.
+    if (process.env.SMTP_PORT === '587' || process.env.SMTP_PORT === '465'
+        || process.env.SMTP_PORT === '25') {
       meh(`SMTP_PORT is ${process.env.SMTP_PORT}`,
           'DigitalOcean blocks 25, 465 and 587 on all Droplets. '
-          + 'SES also accepts 2587 — use that.');
+          + 'Use 2587 for SES, or 2525 for Brevo.');
     }
-    else bad('MAIL_TRANSPORT is not smtp in production',
-             'The site will work perfectly and nobody will receive anything.');
 
     const upload = join(root, 'public', 'uploads');
     try {
