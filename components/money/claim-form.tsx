@@ -32,7 +32,7 @@ export default function ClaimForm({
     return (
       <Done title="Thank you">
         <p className="text-sm text-ink-mid">
-          The treasurer will check it against the account and confirm. Your balance updates once they do — a reference on its own does not move it.
+          The treasurer will check it against the account and confirm. The page updates once they do — a reference on its own does not.
         </p>
       </Done>
     );
@@ -99,7 +99,7 @@ export default function ClaimForm({
         </form>
 
         <p className="mt-4 text-xs text-ink-mid">
-          The treasurer checks this against the account before it counts, so your balance
+          The treasurer checks this against the account before it counts, so the page
           will not change straight away.
         </p>
       </Card>

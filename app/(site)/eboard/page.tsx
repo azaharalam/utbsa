@@ -13,7 +13,7 @@ export default async function EBoard() {
       <p className="mb-1.5 font-display text-sm font-semibold text-kantha">{settings.current_session}</p>
       <h1 className="mb-2 font-display text-3xl font-bold sm:text-4xl">Who&apos;s running things this year</h1>
       <p className="mb-8 max-w-2xl text-ink-mid">
-        Elected each spring by members in good standing. Email any of us — that is what we are here for.
+        Elected each spring by members in good standing. Email us at info@utoledobsa.org — it reaches everyone listed below.
       </p>
 
       {board.length ? (

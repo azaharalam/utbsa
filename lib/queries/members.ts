@@ -97,10 +97,14 @@ export async function touchLastSeen(id: string) {
 }
 
 /** Fields a member is allowed to change about themselves. Note what is absent:
- *  role, status, email, approved_at. Those are not in this list on purpose. */
+ *  role, status, email, approved_at — and personal_email.
+ *
+ *  personal_email is where every sign-in link goes. Editable from inside the
+ *  account, anyone who borrowed a signed-in phone could point it at their own
+ *  inbox and hold the account permanently. An admin changes it instead. */
 export type SelfEditable = {
   full_name: string;
-  personal_email: string | null;
+  university_email: string | null;
   phone: string | null;
   member_type: string;
   student_level: string | null;
@@ -118,7 +122,7 @@ export async function updateSelf(id: string, p: SelfEditable) {
   await sql`
     update members set
       full_name = ${p.full_name},
-      personal_email = ${p.personal_email},
+      university_email = ${p.university_email},
       phone = ${p.phone},
       member_type = ${p.member_type},
       student_level = ${p.student_level},

@@ -66,7 +66,7 @@ export default function NominateBox({
         <h2 className="mb-1 font-display text-base font-bold">Standing for office</h2>
         <p className="text-sm text-ink-mid">{eligible.why}</p>
         <p className="mt-2 text-sm text-ink-mid">
-          You can still vote — every active member votes, whatever their dues.
+          You can still vote — every active member votes, whatever they have given.
         </p>
       </Card>
     );

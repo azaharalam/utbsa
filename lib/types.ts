@@ -67,6 +67,19 @@ export type EventRow = {
   is_public: boolean;
   is_published: boolean;
   is_potluck: boolean;
+  cancelled_at: string | null;
+
+  // Sporting events. Players register individually (event_players); spectators
+  // RSVP per household as usual. Only the champion and runner-up are recorded.
+  is_tournament: boolean;
+  player_reg_closes_at: string | null;
+  teams_published_at: string | null;
+  champion_team_id: string | null;
+  runner_up_team_id: string | null;
+  // Asked of playing students only, and shown to players and organisers —
+  // never on the public event page.
+  player_contribution_cents: number;
+  cost_breakdown: string | null;
 };
 
 export type Post = {

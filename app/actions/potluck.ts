@@ -34,15 +34,34 @@ export async function releasePotluckItem(_p: FormState, fd: FormData): Promise<F
 export async function addPotluckItem(_p: FormState, fd: FormData): Promise<FormState> {
   try {
     const me = await requirePermission('events');
-    await P.addItem(me, {
+    const covers = Number(fd.get('covers') ?? 10);
+    const split = Number(fd.get('split_into') ?? 1);
+
+    const ids = await P.addItems(me, {
       eventId: s(fd, 'event_id'),
       category: s(fd, 'category') || 'rice',
       dish: s(fd, 'dish'),
-      covers: Number(fd.get('covers') ?? 10),
+      covers,
+      splitInto: split,
       note: s(fd, 'note') || null,
     });
     revalidatePath(`/admin/events/${s(fd, 'event_id')}`);
-    return { ok: 'Added.' };
+    return {
+      ok: ids.length > 1
+        ? `Added ${ids.length} portions of ${Math.floor(covers / ids.length)}–`
+          + `${covers - Math.floor(covers / ids.length) * (ids.length - 1)}.`
+        : 'Added.',
+    };
+  } catch (e) { return { error: (e as Error).message }; }
+}
+
+/** Put a dish against somebody who offered in person. Admin only. */
+export async function assignPotluckItem(_p: FormState, fd: FormData): Promise<FormState> {
+  try {
+    const me = await requirePermission('events');
+    const dish = await P.assignItem(me, s(fd, 'item_id'), s(fd, 'member_id'));
+    revalidatePath(`/admin/events/${s(fd, 'event_id')}`);
+    return { ok: `${dish} assigned.` };
   } catch (e) { return { error: (e as Error).message }; }
 }
 

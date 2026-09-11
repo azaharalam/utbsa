@@ -45,14 +45,13 @@ export default function PotluckEditor({
         <div>
           <h2 className="font-display text-lg font-bold">Potluck list</h2>
           <p className="text-sm text-ink-mid">
-            One row per dish, per person. Splitting beef between three cooks means
-            three beef rows — use <strong>Copy</strong> and change the number each covers.
+            You set the list; members only pick from it. Nobody cooks rice for 120 —
+            put <strong>120</strong> and <strong>split 4 ways</strong> and you get four
+            rows of 30, each its own dish from then on.
           </p>
         </div>
         <div className="flex gap-2">
-          <Pill tone={covers >= expected ? 'green' : 'gold'}>
-            feeds about {covers} · {expected} expected
-          </Pill>
+          <Pill tone="grey">feeds about {covers}</Pill>
           <Pill tone={claimed === items.length && items.length > 0 ? 'green' : 'grey'}>
             {claimed} of {items.length} claimed
           </Pill>
@@ -155,11 +154,24 @@ export default function PotluckEditor({
                     <label className="mb-1 block text-xs font-semibold text-ink-mid">Dish</label>
                     <input name="dish" required placeholder="Beef curry" className={cell} />
                   </div>
-                  <div className="w-24">
-                    <label className="mb-1 block text-xs font-semibold text-ink-mid">Covers</label>
-                    <input name="covers" type="number" min={1} max={200} defaultValue={15} className={cell} />
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-semibold text-ink-mid">
+                      For how many
+                    </label>
+                    <input name="covers" type="number" min={1} max={500} defaultValue={15}
+                      className={cell} />
                   </div>
-                  <div className="w-48">
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-semibold text-ink-mid">
+                      Split
+                    </label>
+                    <select name="split_into" defaultValue="1" className={cell}>
+                      {[1,2,3,4,5,6,8,10,12].map((n) => (
+                        <option key={n} value={n}>{n === 1 ? 'no split' : `${n} ways`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-40">
                     <label className="mb-1 block text-xs font-semibold text-ink-mid">Note</label>
                     <input name="note" placeholder="Optional" className={cell} />
                   </div>

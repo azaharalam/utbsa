@@ -36,6 +36,11 @@ export async function itemsFor(eventId: string): Promise<PotluckItem[]> {
   `;
 }
 
+/**
+ * `feeds` is a plain total, deliberately not measured against the RSVP count.
+ * More people turn up than answer, so a "covered / needed" ratio would say
+ * there is enough food when there is not, which is worse than saying nothing.
+ */
 export async function potluckSummary(eventId: string) {
   const items = await itemsFor(eventId);
   const claimed = items.filter((i) => i.claimed_by);
@@ -43,8 +48,8 @@ export async function potluckSummary(eventId: string) {
     total: items.length,
     claimed: claimed.length,
     open: items.length - claimed.length,
-    covered: claimed.reduce((s, i) => s + i.covers, 0),
-    needed: items.reduce((s, i) => s + i.covers, 0),
+    feeds: items.reduce((s, i) => s + i.covers, 0),
+    feedsClaimed: claimed.reduce((s, i) => s + i.covers, 0),
   };
 }
 
@@ -64,6 +69,64 @@ export async function addItem(actor: Member, i: {
   `;
   await trackedCreate(actor.id, 'potluck_items', row.id, 'potluck.add');
   return row.id;
+}
+
+/**
+ * Add one dish, optionally split into several portions.
+ *
+ * Nobody cooks rice for 120. The organiser types "Rice, 120 people, 4 ways"
+ * and gets four rows of 30 — a shortcut for typing four near-identical rows,
+ * and nothing more. The rows are ordinary independent dishes the moment they
+ * exist: separately editable, deletable and claimable. Nothing records that
+ * they came from a split, and there is no such thing as re-splitting.
+ *
+ * The remainder rides on the last portion: 100 across 3 gives 33, 33, 34.
+ */
+export async function addItems(actor: Member, i: {
+  eventId: string; category: string; dish: string; covers: number;
+  splitInto?: number; note?: string | null;
+}) {
+  await assertEvents(actor);
+  const dish = i.dish.trim();
+  if (!dish) throw new Error('Give the dish a name.');
+
+  const ways = Math.max(1, Math.min(20, i.splitInto ?? 1));
+  const base = Math.floor(i.covers / ways);
+  const ids: string[] = [];
+
+  for (let n = 1; n <= ways; n++) {
+    const covers = n === ways ? i.covers - base * (ways - 1) : base;
+    const label = ways > 1 ? `${dish} (${n} of ${ways})` : dish;
+
+    const [row] = await sql<{ id: string }[]>`
+      insert into potluck_items (event_id, category, dish, covers, note, sort_order)
+      values (${i.eventId}, ${i.category}, ${label}, ${covers},
+              ${i.note ?? null}, ${categoryOrder(i.category)})
+      returning id
+    `;
+    await trackedCreate(actor.id, 'potluck_items', row.id, 'potluck.add');
+    ids.push(row.id);
+  }
+  return ids;
+}
+
+/**
+ * Put a dish against somebody who said they would bring it in person.
+ *
+ * Admin only — a member cannot volunteer anyone but themselves, because
+ * being committed in public without knowing is how people end up annoyed.
+ */
+export async function assignItem(actor: Member, itemId: string, memberId: string) {
+  await assertEvents(actor);
+  const [row] = await sql<{ id: string; dish: string }[]>`
+    update potluck_items
+    set claimed_by = ${memberId}, claimed_at = now()
+    where id = ${itemId} and claimed_by is null
+    returning id, dish
+  `;
+  if (!row) throw new Error('Someone has already taken that one.');
+  await tracked(actor.id, 'potluck_items', itemId, 'potluck.assign', async () => {});
+  return row.dish;
 }
 
 /**
@@ -87,6 +150,21 @@ export async function updateItem(actor: Member, itemId: string, i: {
   category: string; dish: string; covers: number; note?: string | null;
 }) {
   await assertEvents(actor);
+
+  // Somebody agreed to bring a specific thing. Changing it under them means
+  // they arrive with the wrong dish. Release it first, then edit.
+  const [claimed] = await sql<{ dish: string; name: string }[]>`
+    select p.dish, m.full_name as name from potluck_items p
+    join members m on m.id = p.claimed_by
+    where p.id = ${itemId}
+  `;
+  if (claimed) {
+    throw new Error(
+      `${claimed.name} has already offered to bring ${claimed.dish}. `
+      + `Release it first if it needs changing.`
+    );
+  }
+
   await tracked(actor.id, 'potluck_items', itemId, 'potluck.update', async () => {
     await sql`
       update potluck_items

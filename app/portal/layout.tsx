@@ -42,7 +42,7 @@ export default async function PortalLayout({ children }: { children: React.React
           items={[
             { href: '/portal', label: 'Dashboard' },
             { href: '/portal/events', label: 'Events' },
-            { href: '/portal/dues', label: 'My dues' },
+            { href: '/portal/dues', label: 'My contribution' },
             { href: '/portal/election', label: 'Election' },
             { href: '/portal/arrivals', label: 'Arrivals' },
             { href: '/portal/giveaway', label: 'Giveaway' },

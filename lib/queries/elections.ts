@@ -115,7 +115,9 @@ export async function canStand(memberId: string): Promise<{ ok: boolean; why?: s
   if (m.status !== 'active') return { ok: false, why: 'Your membership is not active.' };
   if (m.member_type !== 'student') return { ok: false, why: 'Only students can stand for office.' };
   if (m.balance > 0) {
-    return { ok: false, why: `Your dues balance is $${(m.balance / 100).toFixed(2)}. It needs to be clear to stand.` };
+    return { ok: false, why:
+      `Officers are expected to have contributed for the semester. `
+      + `Yours has not come through yet — send it and this will clear.` };
   }
   return { ok: true };
 }

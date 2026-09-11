@@ -7,6 +7,10 @@ import RsvpBox from '@/components/money/rsvp';
 import PotluckBoard from '@/components/money/potluck-board';
 import AddToCalendar from '@/components/money/add-to-calendar';
 import { myRsvp, eventHeadcount, eventRsvps } from '@/lib/queries/tickets';
+import {
+  teamsFor, playersFor, registrationOpen, myRegistration, contributionFor,
+} from '@/lib/queries/tournament';
+import TournamentPanel from '@/components/money/tournament-panel';
 import { itemsFor } from '@/lib/queries/potluck';
 import { householdOf } from '@/lib/queries/households';
 
@@ -22,13 +26,24 @@ export default async function EventPage({ params }: { params: { slug: string } }
 
   const canRsvp = !!me && ['active', 'inactive', 'alumni'].includes(me.status);
 
-  const [existing, headcount, household, potluck, attending] = await Promise.all([
+  const [existing, headcount, household, potluck, attending,
+         teams, players, myPlay, contribution] = await Promise.all([
     canRsvp ? myRsvp(me!.id, e.id) : Promise.resolve(null),
     eventHeadcount(e.id),
     canRsvp ? householdOf(me!.id) : Promise.resolve([]),
     e.is_potluck ? itemsFor(e.id) : Promise.resolve([]),
     canRsvp ? eventRsvps(e.id) : Promise.resolve([]),
+    e.is_tournament ? teamsFor(e.id) : Promise.resolve([]),
+    e.is_tournament ? playersFor(e.id) : Promise.resolve([]),
+    e.is_tournament && me ? myRegistration(me.id, e.id) : Promise.resolve(null),
+    e.is_tournament ? contributionFor(e.id) : Promise.resolve({
+      player_contribution_cents: 0, cost_breakdown: null,
+    }),
   ]);
+
+  const regState = e.is_tournament ? registrationOpen(e) : { open: false };
+  const teamNamed = (id: string | null) =>
+    id ? (teams.find((t) => t.id === id)?.name ?? null) : null;
 
   // Somebody else in the household may already have answered for both.
   const answeredBy = existing && existing.member_id !== me?.id
@@ -87,6 +102,27 @@ export default async function EventPage({ params }: { params: { slug: string } }
         <RsvpBox eventId={e.id} existing={existing} headcount={headcount}
           household={household.map((h) => ({ id: h.id, full_name: h.full_name }))}
           answeredBy={answeredBy} calendar={calendar} slug={e.slug} />
+      )}
+
+      {e.is_tournament && (
+        <div className="mb-6">
+          <TournamentPanel
+            eventId={e.id}
+            open={regState.open}
+            closedWhy={regState.why}
+            mine={myPlay}
+            teams={teams}
+            players={players}
+            published={Boolean(e.teams_published_at)}
+            champion={teamNamed(e.champion_team_id)}
+            runnerUp={teamNamed(e.runner_up_team_id)}
+            /* Shown to the signed-in player only — never on the public page. */
+            contributionCents={me ? contribution.player_contribution_cents : 0}
+            costBreakdown={me ? contribution.cost_breakdown : null}
+            isStudent={me?.member_type === 'student'}
+            signedIn={Boolean(me)}
+          />
+        </div>
       )}
 
       {e.is_potluck && potluck.length > 0 && (

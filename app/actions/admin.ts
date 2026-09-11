@@ -109,6 +109,14 @@ export async function saveEvent(_prev: FormState, fd: FormData): Promise<FormSta
       location_addr: String(fd.get('location_addr') ?? '').trim() || null,
       is_public: fd.get('is_public') === 'on',
       isPotluck: fd.get('is_potluck') === 'on',
+      isTournament: fd.get('is_tournament') === 'on',
+      playerRegClosesAt: fd.get('player_reg_closes_at')
+        ? new Date(String(fd.get('player_reg_closes_at'))) : null,
+      // Dollars in the form, cents in the database. Rounded so a stray
+      // "15.005" cannot put a fraction of a cent into an integer column.
+      playerContributionCents:
+        Math.round(Number(fd.get('player_contribution') ?? 0) * 100) || 0,
+      costBreakdown: String(fd.get('cost_breakdown') ?? '').trim() || null,
     });
 
     await audit(me.id, 'event.save', 'event', id, { slug });

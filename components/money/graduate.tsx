@@ -20,7 +20,7 @@ export default function GraduateBox({ memberType }: { memberType: string }) {
       <h2 className="mb-1 font-display text-base font-bold">Finished your degree?</h2>
       <p className="mb-3 text-sm text-ink-mid">
         Let us know and an admin will move you to alumni. You stay in the directory
-        and keep coming to everything — you just stop being charged semester dues.
+        and keep coming to everything — we just stop asking you for the semester contribution.
       </p>
 
       {state?.error && <Notice tone="error">{state?.error}</Notice>}

@@ -79,22 +79,26 @@ export default function ProfileForm({
 
           <form action={pAction}>
             <Field label="Full name" name="full_name" defaultValue={member.full_name} required />
-            {member.university_email && (
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-semibold text-ink-mid">
-                  UToledo email
-                </label>
-                <div className="rounded-lg border border-[#D6D1C2] bg-muslin-deep px-3 py-2.5 text-sm text-ink-mid">
-                  {member.university_email}
-                </div>
-                <p className="mt-1 text-xs text-ink-mid">
-                  Fixed — it is how we confirm you are at UToledo. Ask an admin if it is wrong.
-                </p>
+            {/*
+              The personal address is where every sign-in link goes, so it is
+              fixed here. Left editable, anyone who borrowed a signed-in phone
+              could point it at themselves and hold the account for good.
+            */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-semibold text-ink-mid">
+                Personal email
+              </label>
+              <div className="rounded-lg border border-[#D6D1C2] bg-muslin-deep px-3 py-2.5 text-sm text-ink-mid">
+                {member.personal_email ?? '—'}
               </div>
-            )}
-            <Field label="Personal email" name="personal_email" type="email"
-              defaultValue={member.personal_email}
-              hint="Signs you in just like your UToledo address, and keeps working after you graduate." />
+              <p className="mt-1 text-xs text-ink-mid">
+                Fixed — this is where we send your sign-in link. Ask an admin to change it.
+              </p>
+            </div>
+
+            <Field label="UToledo email" name="university_email" type="email"
+              defaultValue={member.university_email}
+              hint="Signs you in as well. We do not send here — the university holds back mail from addresses it does not recognise." />
             <Field label="Phone" name="phone" type="tel" defaultValue={member.phone} />
 
             <div className="grid gap-x-4 sm:grid-cols-2">

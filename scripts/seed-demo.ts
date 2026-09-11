@@ -91,8 +91,10 @@ async function seed() {
     const university = ['student', 'alumni'].includes(type)
       ? m.email.replace(DOMAIN, '@rockets.utoledo.edu')
       : null;
-    // We write to the UToledo address while it works, the personal one after.
-    const contact = type === 'student' ? (university ?? m.email) : m.email;
+    // We write to the personal address, for everyone. The university
+    // quarantines mail from a domain it does not recognise, so a link sent to
+    // a @rockets address never arrives. See migration 019.
+    const contact = m.email;
 
     const [row] = await sql<any[]>`
       insert into members (

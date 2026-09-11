@@ -189,7 +189,7 @@ export default async function Portal() {
             {isStudent && balance > 0 && (
               <div className="flex flex-wrap items-center gap-3">
                 <span className="min-w-0 flex-1 text-sm">
-                  Your dues balance is ${(balance / 100).toFixed(2)}. No rush — it
+                  We ask $15 a semester — not yet received. No rush — it
                   carries over.
                 </span>
                 <Link href="/portal/dues"
@@ -267,9 +267,9 @@ export default async function Portal() {
               body: 'Rooms, sublets, and people looking' },
             { href: '/portal/jobs', title: 'Jobs',
               body: 'Openings and referrals from alumni' },
-            { href: '/portal/dues', title: 'My dues',
-              body: !isStudent ? 'You are not charged dues'
-                   : balance > 0 ? `$${(balance / 100).toFixed(2)} outstanding` : 'All settled' },
+            { href: '/portal/dues', title: 'My contribution',
+              body: !isStudent ? 'Nothing asked of you'
+                   : balance > 0 ? 'Not yet sent' : 'Thank you' },
           ].map((c) => (
             <Link key={c.href} href={c.href}>
               <Card className="p-3 transition-colors hover:border-kantha">

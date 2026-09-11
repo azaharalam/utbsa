@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { friendlyDbError } from '@/lib/errors';
 import { requirePermission, requireApproved } from '@/lib/session';
 import * as Dues from '@/lib/queries/dues';
 import * as Don from '@/lib/queries/donations';
@@ -16,26 +17,6 @@ import { sql } from '@/lib/db';
 import type { AdjustmentKind, PaymentMethod, DonorType } from '@/lib/money';
 
 export type FormState = { error?: string; ok?: string };
-
-/**
- * A raw constraint violation tells the person nothing they can act on.
- * "new row for relation \"donors\" violates check constraint" is a message
- * for whoever wrote the code, not whoever is filling in the form.
- */
-function friendlyDbError(e: unknown): string {
-  const msg = (e as Error).message ?? 'Something went wrong.';
-  if (msg.includes('violates check constraint')) {
-    return 'One of the values here is not allowed. If you picked it from a dropdown, '
-         + 'that is a bug — please report it.';
-  }
-  if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
-    return 'That has already been recorded.';
-  }
-  if (msg.includes('violates foreign key')) {
-    return 'Something this refers to no longer exists. Reload the page and try again.';
-  }
-  return msg;
-}
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -155,20 +136,23 @@ export async function sendReminders(_p: FormState, fd: FormData): Promise<FormSt
     // Each recipient is attempted on its own. One bad address, or the
     // provider's daily limit, must not take the rest of the batch with it.
     const result = await sendBulk(rows, async (r) => {
-      const owed = (Number(r.balance) / 100).toFixed(2);
+      // The amount owed is deliberately NOT in this email. Naming a sum makes
+      // it an invoice; the semester figure and the reason do the work instead.
+      // The treasurer still sees the real balance on /admin/dues.
       // A fresh link each time, which quietly retires any older one.
       const token = await Claims.issueClaimToken(r.id);
 
       return {
-        subject: 'UTBSA dues — no rush',
+        subject: 'UTBSA — a note about the semester',
         text: `Assalamu alaikum ${r.full_name.split(' ')[0]},\n\n`
-            + `Your dues balance is currently $${owed}. If you missed a semester it has carried over, which is normal and nothing to worry about.\n\n`
-            + `To pay, send it by ${settings.pay_method_label}:\n\n`
+            + `We ask students for $15 a semester. It covers food at our events for one person — the rest we raise from sponsors.\n\n`
+            + `We have not seen yours yet.\n\n`
+            + `To send it, use ${settings.pay_method_label}:\n\n`
             + `  To:  ${settings.pay_to_name}\n`
             + `  At:  ${settings.pay_to_handle}\n\n`
             + `Then open this link and paste the transaction ID:\n\n`
             + `${site}/pay/${token}\n\n`
-            + `The treasurer checks it against the account, so your balance will not update straight away.\n\n`
+            + `The treasurer checks it against the account, so the page will not update straight away.\n\n`
             + `If now isn't a good time, please tell us. We have a fund for exactly this and nobody needs to explain themselves.\n\n`
             + `— UTBSA`,
       };

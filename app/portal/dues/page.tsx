@@ -8,7 +8,7 @@ import { myClaims } from '@/lib/queries/claims';
 import type { DuesLine } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'My dues' };
+export const metadata = { title: 'My contribution' };
 
 export default async function MyDues() {
   const me = await requireApproved();
@@ -27,26 +27,27 @@ export default async function MyDues() {
       <h1 className="mb-1 font-display text-2xl font-bold sm:text-3xl">My dues</h1>
       <p className="mb-5 text-sm text-ink-mid">
         Dues are charged to students each semester. Spouses, faculty, alumni, and
-        community members are not charged.
+        we ask only students.
       </p>
 
       <Card className="mb-6">
-        <p className="text-xs font-semibold text-ink-mid">Current balance</p>
+        <p className="text-xs font-semibold text-ink-mid">Not yet sent</p>
         <p className="font-display text-4xl font-bold text-nil"><Money cents={balance} /></p>
 
         {!isStudent ? (
           <p className="mt-2 text-sm text-ink-mid">
-            You are not charged dues. Everything here is free to you.
+            We only ask students to contribute. Nothing is expected of you.
           </p>
         ) : balance > 0 ? (
           <p className="mt-2 text-sm text-ink-mid">
-            Anything unpaid carries over to next semester. There is no penalty and no rush —
-            pay whenever suits, and tell us if now is not a good time.
+            We ask $15 a semester. It covers food at our events for one person — the rest
+            we raise from sponsors. Send it whenever suits, and if now is not a good time,
+            say so. We have a fund for exactly that and nobody has to explain themselves.
           </p>
         ) : balance < 0 ? (
-          <p className="mt-2 text-sm text-ink-mid">You are in credit. This carries forward.</p>
+          <p className="mt-2 text-sm text-ink-mid">You have given more than we asked. Thank you — it carries forward.</p>
         ) : (
-          <p className="mt-2 text-sm text-ink-mid">All settled. Thank you.</p>
+          <p className="mt-2 text-sm text-ink-mid">Nothing outstanding. Thank you.</p>
         )}
 
       </Card>
@@ -96,8 +97,8 @@ export default async function MyDues() {
       ) : (
         <Empty title="Nothing yet"
           body={isStudent
-            ? 'Charges appear here once dues are assessed for the semester.'
-            : 'You are not charged dues, so there is nothing to show.'} />
+            ? 'This fills in once the semester starts.'
+            : 'We only ask students to contribute, so there is nothing here.'} />
       )}
     </>
   );

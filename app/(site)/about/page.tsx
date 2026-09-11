@@ -25,7 +25,7 @@ export default function About() {
 
         <h2 className="pt-4 font-display text-2xl font-bold">How it is funded</h2>
         <p className="text-ink-mid">
-          Members pay dues each spring and fall. That covers food and venue costs. The rest comes
+          We ask students for $15 each spring and fall. That covers food and venue costs. The rest comes
           from ticketed sporting events and donations. The treasurer publishes a summary at the
           end of each term.
         </p>

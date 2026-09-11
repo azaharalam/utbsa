@@ -80,7 +80,7 @@ export default async function Sponsors() {
           </p>
           <p className="mb-4 text-sm text-ink-mid">
             You can earmark a gift for something specific: a cultural programme,
-            or the fund that quietly covers dues for students who cannot pay.
+            or the fund that quietly covers the semester for students who cannot manage it.
             That last one is $15 a semester per student.
           </p>
           <Link href="/contact" className="font-semibold text-kantha">Get in touch →</Link>

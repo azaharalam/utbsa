@@ -66,10 +66,38 @@ export default function EventForm() {
           <Toggle label="Visible to the public" name="is_public" defaultChecked={true} />
           <Toggle label="This is a potluck — members bring dishes"
             name="is_potluck" defaultChecked={false} />
+          <Toggle label="This is a tournament — members register to play"
+            name="is_tournament" defaultChecked={false} />
         </div>
+
         <p className="mb-4 text-xs text-ink-mid">
-          Tick the potluck box and you can build the dish list once the event is saved.
+          Save the event first, then build the dish list or draw up the teams.
         </p>
+
+        {/*
+          Tournament settings. The contribution and the breakdown are shown to
+          players and organisers only — never on the public event page.
+        */}
+        <details className="mb-4 rounded-lg border border-[#D6D1C2] p-3">
+          <summary className="cursor-pointer text-sm font-semibold">
+            If this is a tournament
+          </summary>
+          <div className="mt-3">
+            <Field label="Player registration closes" name="player_reg_closes_at"
+              type="datetime-local"
+              hint="Usually a week before, so there is time to draw up the sides." />
+
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              <Field label="We ask each playing student for ($)" name="player_contribution"
+                type="number"
+                hint="Leave at 0 if nobody is asked for anything." />
+            </div>
+
+            <Field label="What it covers" name="cost_breakdown" as="textarea" rows={3}
+              placeholder="Ground rental $180&#10;Balls and kit $25&#10;Trophy $35"
+              hint="Players and organisers see this. It never appears on the public page." />
+          </div>
+        </details>
 
         <Submit />
       </form>

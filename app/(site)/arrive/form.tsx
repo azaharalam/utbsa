@@ -51,8 +51,18 @@ export default function ArrivalForm() {
         </div>
 
         <div className="grid gap-x-4 sm:grid-cols-2">
-          <Field label="Program" name="program" placeholder="MS / PhD / BS" />
-          <Field label="Department" name="department" placeholder="Computer Science" />
+          <Field label="Programme" name="program" as="select" defaultValue=""
+            options={[
+              { value: '', label: 'Choose one' },
+              { value: 'undergrad', label: 'Undergraduate' },
+              { value: 'masters', label: "Master's" },
+              { value: 'phd', label: 'PhD' },
+              { value: 'postdoc', label: 'Postdoc' },
+              { value: 'visiting', label: 'Visiting scholar' },
+              { value: 'other', label: 'Something else' },
+            ]} />
+          <Field label="Department" name="department"
+            placeholder="Optional — Computer Science, Public Health…" />
         </div>
 
         <Field label="Anything else" name="note" as="textarea" rows={2}

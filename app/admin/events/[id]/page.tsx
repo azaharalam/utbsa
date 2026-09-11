@@ -4,12 +4,14 @@ import { requirePermission } from '@/lib/session';
 import { sql } from '@/lib/db';
 import { eventRsvps, eventHeadcount, eventOrders, refundPreview } from '@/lib/queries/tickets';
 import { itemsFor } from '@/lib/queries/potluck';
+import { teamsFor, playersFor } from '@/lib/queries/tournament';
 import { Card, Pill, Empty } from '@/components/ui';
 import { Money } from '@/components/money/forms';
 import CheckInList from './checkin';
 import TicketDesk from './tickets';
 import CancelBox from './cancel';
 import PotluckEditor from './potluck';
+import Teams from './teams';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,13 +21,24 @@ export default async function EventDetail({ params }: { params: { id: string } }
   const [event] = await sql<any[]>`select * from events where id = ${params.id}`;
   if (!event) notFound();
 
-  const [rsvps, headcount, orders, refund, potluck] = await Promise.all([
-    eventRsvps(event.id),
-    eventHeadcount(event.id),
-    eventOrders(me, event.id),
-    refundPreview(me, event.id),
-    event.is_potluck ? itemsFor(event.id) : Promise.resolve([]),
-  ]);
+  const [rsvps, headcount, orders, refund, potluck, teams, players, memberList] =
+    await Promise.all([
+      eventRsvps(event.id),
+      eventHeadcount(event.id),
+      eventOrders(me, event.id),
+      refundPreview(me, event.id),
+      event.is_potluck ? itemsFor(event.id) : Promise.resolve([]),
+      event.is_tournament ? teamsFor(event.id) : Promise.resolve([]),
+      event.is_tournament ? playersFor(event.id) : Promise.resolve([]),
+      event.is_tournament
+        ? sql<{ id: string; full_name: string }[]>`
+            select id, full_name from members
+            where status = 'active' order by full_name`
+        : Promise.resolve([]),
+    ]);
+
+  const teamName = (id: string | null) =>
+    id ? (teams.find((t) => t.id === id)?.name ?? null) : null;
 
   const paid = orders.filter((o) => o.status === 'paid');
   const ticketRevenue = paid.reduce((s, o) => s + o.amount_cents, 0);
@@ -41,6 +54,7 @@ export default async function EventDetail({ params }: { params: { id: string } }
       <div className="mb-2 flex flex-wrap items-center gap-3">
         <h1 className="font-display text-2xl font-bold sm:text-3xl">{event.title}</h1>
         {event.is_potluck && <Pill tone="green">potluck</Pill>}
+        {event.is_tournament && <Pill tone="green">tournament</Pill>}
         {event.cancelled_at && <Pill tone="red">cancelled</Pill>}
         {!event.is_public && <Pill tone="gold">members only</Pill>}
       </div>
@@ -79,6 +93,22 @@ export default async function EventDetail({ params }: { params: { id: string } }
         <div className="mb-6">
           <PotluckEditor eventId={event.id} items={potluck}
             expected={headcount.people || 30} />
+        </div>
+      )}
+
+      {event.is_tournament && (
+        <div className="mb-6">
+          <Teams
+            eventId={event.id}
+            teams={teams}
+            players={players}
+            publishedAt={event.teams_published_at}
+            championId={event.champion_team_id}
+            runnerUpId={event.runner_up_team_id}
+            contributionCents={event.player_contribution_cents ?? 0}
+            costBreakdown={event.cost_breakdown}
+            members={memberList}
+          />
         </div>
       )}
 

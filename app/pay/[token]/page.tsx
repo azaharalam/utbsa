@@ -5,10 +5,10 @@ import { getSettings } from '@/lib/queries/settings';
 import ClaimForm from '@/components/money/claim-form';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Send your dues', robots: { index: false } };
+export const metadata = { title: 'Send your contribution', robots: { index: false } };
 
 /**
- * Reached from the link in a dues email. This page is NOT a login.
+ * Reached from the link in a contribution email. This page is NOT a login.
  *
  * The token identifies the member and nothing more. There is no navigation
  * out of here, no directory, no profile — the only thing it can do is attach

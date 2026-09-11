@@ -18,10 +18,15 @@ export async function updateProfile(_prev: FormState, fd: FormData): Promise<For
   const full_name = str(fd, 'full_name');
   if (!full_name) return { error: 'Your name cannot be empty.' };
 
-  const personal = str(fd, 'personal_email');
-  if (personal && !isEmail(personal)) return { error: 'That email address does not look right.' };
-  if (personal && isUniversityEmail(personal)) {
-    return { error: 'Use a non-university address here — it needs to outlive your degree.' };
+  // The personal address is deliberately NOT read from this form — it is
+  // where sign-in links go, and letting it be changed from inside the account
+  // would let anyone who borrowed a signed-in phone take the account over.
+  const university = str(fd, 'university_email');
+  if (university && !isEmail(university)) {
+    return { error: 'That email address does not look right.' };
+  }
+  if (university && !isUniversityEmail(university)) {
+    return { error: 'A UToledo address ends in utoledo.edu. Leave it empty if you do not have one.' };
   }
 
   const url = str(fd, 'linkedin_url');
@@ -32,7 +37,7 @@ export async function updateProfile(_prev: FormState, fd: FormData): Promise<For
     // POST anything they like here; those fields are simply never consulted.
     await Members.updateSelf(me.id, {
       full_name,
-      personal_email: personal,
+      university_email: university,
       phone: str(fd, 'phone'),
       member_type: str(fd, 'member_type') ?? 'student',
       student_level: str(fd, 'student_level'),

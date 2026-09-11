@@ -543,6 +543,29 @@ async function main() {
         'Deploying while somebody has the site open gives them a blank page.');
   }
 
+  // The contribution is framed as a request, not a debt. A member-facing page
+  // that names a sum they owe undoes that in one line.
+  const debtWords = walk(join(root, 'app'))
+    .filter((f: string) => f.endsWith('.tsx') && !f.includes('/admin/'))
+    .filter((f: string) => {
+      const src = readFileSync(f, 'utf8');
+      return /you owe|your balance|amount outstanding|dues balance|unpaid dues/i.test(src);
+    })
+    .map((f: string) => f.replace(root + '/', ''));
+  if (!debtWords.length) ok('no member-facing page calls the contribution a debt');
+  else bad(`these tell a member they owe money: ${debtWords.join(', ')}`,
+           'The contribution is a request. Naming a sum owed makes it a fee.');
+
+  // A player registration must never go through rsvps: that table allows one
+  // row per household, and two spouses can both play.
+  const tournamentSrc = read('lib/queries/tournament.ts') ?? '';
+  if (!tournamentSrc || tournamentSrc.includes('event_players')) {
+    ok('players register individually, not per household');
+  } else {
+    bad('tournament registration does not use event_players',
+        'rsvps is one-per-household, which is wrong for players.');
+  }
+
   // Developer instructions have no business on a page members see.
   const devLeaks = walk(join(root, 'app'))
     .filter((f: string) => f.endsWith('.tsx'))

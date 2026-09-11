@@ -137,6 +137,10 @@ export type EventInput = {
   description: string | null; starts_at: Date; ends_at: Date | null;
   location_name: string | null; location_addr: string | null; is_public: boolean;
   isPotluck?: boolean;
+  isTournament?: boolean;
+  playerRegClosesAt?: Date | null;
+  playerContributionCents?: number;
+  costBreakdown?: string | null;
 };
 
 export async function saveEvent(actor: Member, e: EventInput) {
@@ -151,7 +155,11 @@ export async function saveEvent(actor: Member, e: EventInput) {
         slug = ${e.slug}, title = ${e.title}, bengali_title = ${e.bengali_title},
         description = ${e.description}, starts_at = ${e.starts_at}, ends_at = ${e.ends_at},
         location_name = ${e.location_name}, location_addr = ${e.location_addr},
-        is_public = ${e.is_public}, is_potluck = ${e.isPotluck ?? false}
+        is_public = ${e.is_public}, is_potluck = ${e.isPotluck ?? false},
+        is_tournament = ${e.isTournament ?? false},
+        player_reg_closes_at = ${e.playerRegClosesAt ?? null},
+        player_contribution_cents = ${e.playerContributionCents ?? 0},
+        cost_breakdown = ${e.costBreakdown ?? null}
       where id = ${eid}
     `;
     });
@@ -160,10 +168,14 @@ export async function saveEvent(actor: Member, e: EventInput) {
 
   const rows = await sql<{ id: string }[]>`
     insert into events (slug, title, bengali_title, description, starts_at, ends_at,
-                        location_name, location_addr, is_public, is_potluck, term_id)
+                        location_name, location_addr, is_public, is_potluck, term_id,
+                        is_tournament, player_reg_closes_at,
+                        player_contribution_cents, cost_breakdown)
     values (${e.slug}, ${e.title}, ${e.bengali_title}, ${e.description},
             ${e.starts_at}, ${e.ends_at}, ${e.location_name}, ${e.location_addr},
-            ${e.is_public}, ${e.isPotluck ?? false}, ${term?.id ?? null})
+            ${e.is_public}, ${e.isPotluck ?? false}, ${term?.id ?? null},
+            ${e.isTournament ?? false}, ${e.playerRegClosesAt ?? null},
+            ${e.playerContributionCents ?? 0}, ${e.costBreakdown ?? null})
     returning id
   `;
   await trackedCreate(actor.id, 'events', rows[0].id, 'event.create');
