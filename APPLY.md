@@ -1,73 +1,67 @@
-# Write to personal addresses, and fix the check-email page
+# Deploying no longer breaks open tabs
 
-**6 files, one migration.** The first part is a launch blocker.
+**3 files.** Worth having before Friday.
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-personal/. .
+cp -r ~/Downloads/utbsa-chunkfix/. .
 npm run build
-git add -A && git commit -m "write to personal addresses" && git push
+git add -A && git commit -m "survive a deploy with the site open" && git push
 ```
 
-Then on the droplet, **staging first**:
-
-```bash
-cd /srv/utbsa-staging && git pull && npm ci && npm run build \
-  && npm run db:migrate && npm run doctor && sudo systemctl restart utbsa-staging
-
-cd /srv/utbsa && git pull && npm ci && npm run build \
-  && npm run db:migrate && npm run doctor && sudo systemctl restart utbsa
-```
+**For right now, a hard refresh (Ctrl+Shift+R) fixes your current page.**
 
 ---
 
-## 1. The blocker
+## What happened
 
-Your rockets messages were in **quarantine**, not the inbox. You only saw them
-because you went looking; a member never would.
+```
+ChunkLoadError: Loading chunk 6502 failed
+```
 
-Brevo reports "Delivered" because UToledo's server accepted the message — and
-then held it. Nothing bounces, nothing is logged, nothing arrives.
+Next generates new chunk filenames on every build, and `next build` replaces
+`.next` wholesale. Your tab was holding references to the old filenames, so it
+asked for a file that had just been deleted — 404, and the page died.
 
-Every student's contact address was a rockets address. So on Friday: students
-sign up, the confirmation is quarantined, and they cannot get in. They would
-not report it — they would assume the site was broken.
+nginx serves `/_next/static/` straight off disk with a one-year `immutable`
+cache, so browsers hold those references hard.
 
-**Now the app writes to the personal address for everyone.** Gmail delivered
-to the inbox and was opened tonight, so it works today.
+**On Friday this would hit every member with the site open when you deploy.**
+They get a blank page and a console message, which to them is just "the site
+broke".
 
-The migration updates existing members, including all nine officers — without
-it, the change would only affect people who join later and you would all still
-be quarantined tomorrow.
+## Two fixes, both worth having
 
-**Both addresses still sign you in.** `findByEmail` matches `email`,
-`university_email`, or `personal_email`. This changes where we write, not who
-can get in. Verified with both of your addresses.
+**1. The server keeps the old chunks.** `deploy.sh` now copies the previous
+build's `static` directory aside, builds, then copies it back with `cp -rn` so
+the new build always wins on collision. Old tabs keep working until they next
+reload. Costs a few megabytes.
 
-A doctor check now fails if any active member is written to at a
-non-personal address.
+Verified: a chunk present only in the old build survives, and a chunk in both
+keeps the new version.
 
-### Still worth doing
+**2. The browser recovers if it happens anyway** — a different server, a
+cleared cache, a build outside the script. `app/global-error.tsx` catches
+`ChunkLoadError` and reloads once, showing *"The site was updated while you
+had it open"* rather than a blank screen. A sessionStorage guard prevents a
+reload loop.
 
-Have your president ask UToledo IT to allow `utoledobsa.org` — valid SPF,
-DKIM and DMARC, transactional mail only, to students who signed up themselves.
-Slow, but it is the proper fix, and it would let rockets addresses work again.
+It also handles any other fatal client error with a real page — Try again,
+Home — instead of the browser's default.
 
-## 2. The check-email page
+## Use the script from now on
 
-Before, a non-member saw *"We sent a link to aa@yopmail.com"* — a flat claim
-that was untrue, and a dead end.
+```bash
+cd /srv/utbsa && ./deploy/deploy.sh
+```
 
-It now says *"If there is a UTBSA account for that address, a link is on its
-way"*, then a clear second section: **Not a member yet?** with Join, Try
-another address, Contact us, and Home.
+It now detects which service it is from the directory name, so the same script
+works for staging and production, and it health-checks the right port
+afterwards.
 
-The ambiguity is kept on purpose — naming which addresses have accounts would
-turn the form into a membership lookup — but it no longer lies, and it no
-longer strands anyone.
+Running `npm run build` by hand skips the chunk preservation.
 
-**The `MAIL_TRANSPORT=console` note is gone.** Developer instructions on a
-page members see. A doctor check now greps for that pattern outside `/admin`.
+## A doctor check
 
-Both pages also mention the spam folder, and ask people to mark it not-spam —
-which is the fastest way to build the domain's reputation.
+**"a stale build reloads itself instead of dying"** — fails if
+`app/global-error.tsx` is missing.

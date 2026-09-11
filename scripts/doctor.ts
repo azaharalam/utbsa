@@ -534,6 +534,15 @@ async function main() {
   if (perms.includes('PERMISSION_SETS')) ok('access derives from held office, not an account flag');
   else bad('lib/permissions.ts is missing the permission sets');
 
+  // Without a global error boundary, a stale chunk after a deploy takes the
+  // whole page down with a blank screen and a console message.
+  if (existsSync(join(root, 'app', 'global-error.tsx'))) {
+    ok('a stale build reloads itself instead of dying');
+  } else {
+    bad('no app/global-error.tsx',
+        'Deploying while somebody has the site open gives them a blank page.');
+  }
+
   // Developer instructions have no business on a page members see.
   const devLeaks = walk(join(root, 'app'))
     .filter((f: string) => f.endsWith('.tsx'))
