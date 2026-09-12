@@ -461,6 +461,22 @@ async function main() {
   else bad(`these read form state without optional chaining: ${unguarded.join(', ')}`,
            'A timed-out action white-screens the page. Use state?.error.');
 
+  // Approving somebody who never confirmed sends the approval to an address
+  // nobody has proved they can read. But they must stay visible somewhere, or
+  // a mistyped address makes a person vanish.
+  const membersSrc = read('lib/queries/members.ts') ?? '';
+  const filtersQueue = /status = 'pending' and email_verified_at is not null/.test(membersSrc);
+  const keepsVisible = membersSrc.includes('awaitingConfirmation');
+  if (filtersQueue && keepsVisible) {
+    ok('unconfirmed signups are out of the queue but still visible');
+  } else if (!filtersQueue) {
+    bad('the approval queue includes unconfirmed signups',
+        'Approving one sends the email nowhere and they think they were ignored.');
+  } else {
+    bad('unconfirmed signups are filtered out with nowhere to see them',
+        'A mistyped address would make somebody disappear entirely.');
+  }
+
   // Nothing we send should be addressed to a @utoledo.edu address. The
   // university quarantines mail from a domain it does not recognise, so it
   // arrives nowhere and reports nothing. This caught the signup confirmation,

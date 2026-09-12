@@ -1,63 +1,62 @@
-# Signup confirmation never arrived for students
+# Confirm first, then the approval queue
 
-**2 files, no migration. Deploy this one.**
+**6 files, no migration.** Includes the signup fix, so apply this instead of
+`utbsa-signupfix` if you have not done that one yet.
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-signupfix/. .
+cp -r ~/Downloads/utbsa-confirm/. .
 npm run build && npm run doctor
-git add -A && git commit -m "signup confirmation goes to the personal address" && git push
+git add -A && git commit -m "confirm before approval" && git push
 ```
 
-Then on the droplet:
-
-```bash
-cd /srv/utbsa-staging && ./deploy/deploy.sh
-cd /srv/utbsa && ./deploy/deploy.sh
-```
+Then staging, then production.
 
 ---
 
-## What it was
+## Two things, and they are connected
 
-```ts
-const primary = joiningAs === 'student' ? university : personal;
+**The signup confirmation went to the university address.** Students only.
+UToledo quarantines it, so nobody could confirm. Approval and sign-in worked
+because both use `members.email`, which is the personal address. That is why
+it looked like only signup was broken.
+
+`const primary = personal || university;` now, the same rule as sign-in.
+
+**The approval queue did not check for confirmation.** Everybody who signed up
+appeared there unconfirmed, while the page said "All have confirmed their
+email address", which was not true of a single one of them.
+
+Now it is `where status = 'pending' and email_verified_at is not null`.
+
+## Why they are not simply hidden
+
+Filtering alone would have emptied your queue and made every pending person
+disappear. Somebody who mistyped their address would vanish and nobody would
+notice until they asked in person.
+
+So there is a **Waiting to confirm** panel underneath the queue, with a
+**Send it again** button on each row. Out of the queue, still visible.
+
+```
+Approval queue     : Habibur Karim, Confirmed Person
+Waiting to confirm : Never Confirmed, Typo Address
+Nobody lost        : 4 pending, all visible
 ```
 
-For a student the confirmation went to their @rockets.utoledo.edu address,
-which UToledo quarantines. It never reached them and nothing bounced.
+## The people already stuck
 
-Approval and sign-in both use `members.email`, which migration 019 set to the
-personal address, so those arrived normally. That is why it looked like only
-signup was broken.
+Anyone who signed up before this had their confirmation quarantined. Once
+deployed they can go to `/auth/login` with either address and the link will
+reach them. No need to sign up again, and confirming that way moves them into
+the queue.
 
-Only students were affected. Alumni, spouses and community members were
-already getting the personal address.
+If somebody's address was mistyped, **Send it again** will not help either.
+Correct the address on their record first.
 
-| Joining as | Went to | Goes to now |
-|---|---|---|
-| student | ut@rockets.utoledo.edu | ut.personal@gmail.com |
-| alumni | old@gmail.com | unchanged |
-| spouse | spouse@gmail.com | unchanged |
-| community | friend@gmail.com | unchanged |
+## Two doctor checks
 
-## The fix
-
-`const primary = personal || university;`
-
-Same rule as `contactEmail()` and as sign-in. The university address still
-identifies them and still signs them in. We just do not write to it.
-
-The token is issued against the same address, and `verify` matches on any of a
-member's addresses, so nothing else needed changing.
-
-## A doctor check
-
-**"signup writes to the address we can reach"** fails if that branch comes
-back. Verified in both directions.
-
-## For anyone stuck
-
-People who signed up and got nothing already have a pending account. Once this
-is deployed they can go to `/auth/login`, enter either address, and the link
-will reach them. No need to sign up again.
+- **signup writes to the address we can reach** — fails if the university
+  branch returns
+- **unconfirmed signups are out of the queue but still visible** — fails both
+  if they are in the queue and if they are filtered with nowhere to see them

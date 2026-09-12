@@ -206,7 +206,30 @@ async function assertAdmin(actor: Member) {
 
 export async function listPending(actor: Member): Promise<Member[]> {
   await assertAdmin(actor);
-  return sql<Member[]>`select * from members where status = 'pending' order by created_at`;
+  // Confirmed addresses only. Approving somebody who never confirmed means
+  // the approval email goes to an address nobody has proved they can read —
+  // often a typo — and they hear nothing while believing they were ignored.
+  return sql<Member[]>`
+    select * from members
+    where status = 'pending' and email_verified_at is not null
+    order by created_at
+  `;
+}
+
+/**
+ * Signed up but never opened the confirmation link.
+ *
+ * Deliberately still visible, just not in the approval queue. Hiding them
+ * entirely would mean somebody who mistyped their address simply vanishes,
+ * and nobody notices until they ask in person months later.
+ */
+export async function awaitingConfirmation(actor: Member): Promise<Member[]> {
+  await assertAdmin(actor);
+  return sql<Member[]>`
+    select * from members
+    where status = 'pending' and email_verified_at is null
+    order by created_at desc
+  `;
 }
 
 export async function listAll(actor: Member, opts: { status?: string; q?: string } = {}) {

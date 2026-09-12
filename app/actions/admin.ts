@@ -3,9 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/session';
 import * as Members from '@/lib/queries/members';
+import * as Tokens from '@/lib/queries/tokens';
+import { sql } from '@/lib/db';
 import * as Content from '@/lib/queries/content';
 import * as Potluck from '@/lib/queries/potluck';
-import { sendMail, approvalEmail } from '@/lib/mail';
+import { sendMail, approvalEmail, magicLinkEmail } from '@/lib/mail';
 import { audit } from '@/lib/audit';
 import type { MemberStatus } from '@/lib/types';
 
@@ -13,6 +15,32 @@ export type FormState = { error?: string; ok?: string };
 
 function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60);
+}
+
+/**
+ * Send the confirmation link again.
+ *
+ * For somebody who signed up, never confirmed, and is therefore not in the
+ * approval queue. Usually a mistyped address — in which case this will not
+ * arrive either, and the answer is to correct the address first.
+ */
+export async function resendConfirmation(_prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await requireAdmin();
+  try {
+    const id = String(fd.get('id'));
+    const [m] = await sql<{ full_name: string; email: string }[]>`
+      select full_name, email from members
+      where id = ${id} and status = 'pending' and email_verified_at is null
+    `;
+    if (!m) return { error: 'That person has already confirmed, or no longer exists.' };
+
+    const token = await Tokens.issueToken(m.email, 'signup');
+    await sendMail({ to: m.email, ...magicLinkEmail(token, true) });
+    await audit(me.id, 'member.resend_confirmation', 'member', id);
+
+    revalidatePath('/admin/approvals');
+    return { ok: `Sent again to ${m.email}.` };
+  } catch (e) { return { error: (e as Error).message }; }
 }
 
 export async function approveMember(_prev: FormState, fd: FormData): Promise<FormState> {

@@ -1,14 +1,18 @@
 import { requirePermission } from '@/lib/session';
-import { listPending } from '@/lib/queries/members';
+import { listPending, awaitingConfirmation } from '@/lib/queries/members';
 import { Empty } from '@/components/ui';
 import ApprovalRow from './row';
+import Unconfirmed from './unconfirmed';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Approvals' };
 
 export default async function Approvals() {
   const me = await requirePermission('members');
-  const pending = await listPending(me);
+  const [pending, unconfirmed] = await Promise.all([
+    listPending(me),
+    awaitingConfirmation(me),
+  ]);
 
   return (
     <>
@@ -24,6 +28,8 @@ export default async function Approvals() {
       ) : (
         <Empty title="Queue is clear" body="New signups appear here after they confirm their email address." />
       )}
+
+      <Unconfirmed people={unconfirmed} />
     </>
   );
 }
