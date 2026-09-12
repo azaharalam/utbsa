@@ -56,7 +56,15 @@ export async function signUp(_prev: FormState, fd: FormData): Promise<FormState>
     if (!isEmail(personal)) return { error: 'That email address does not look right.' };
   }
 
-  const primary = joiningAs === 'student' ? university : personal;
+  // The personal address, always. It used to be the university one for
+  // students, which is where this broke: UToledo quarantines mail from a
+  // domain it does not recognise, so the confirmation never arrived and the
+  // person could not finish signing up. Approval and sign-in worked, because
+  // both use members.email, which migration 019 set to the personal address.
+  //
+  // Same rule as contactEmail(). The university address still identifies them
+  // and still signs them in; we just do not write to it.
+  const primary = personal || university;
 
   if (await Tokens.tooManyRecent(primary)) {
     return { error: 'Too many requests for this address. Try again in an hour.' };

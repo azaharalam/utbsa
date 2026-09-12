@@ -1,73 +1,63 @@
-# The edit row stays open — fixed, plus an audit of every form
+# Signup confirmation never arrived for students
 
-**3 files.** Includes the Copy removal, so apply this instead of
-`utbsa-nocopy` if you have not done that one yet.
+**2 files, no migration. Deploy this one.**
 
 ```bash
 cd ~/Desktop/Projects/utbsa-own
-cp -r ~/Downloads/utbsa-panelfix/. .
+cp -r ~/Downloads/utbsa-signupfix/. .
 npm run build && npm run doctor
+git add -A && git commit -m "signup confirmation goes to the personal address" && git push
+```
+
+Then on the droplet:
+
+```bash
+cd /srv/utbsa-staging && ./deploy/deploy.sh
+cd /srv/utbsa && ./deploy/deploy.sh
 ```
 
 ---
 
-## The bug
+## What it was
 
-The potluck editor is gated by an `editing` state that was never cleared when
-the save succeeded. The confirmation appeared, the row stayed open, and it
-looked as though nothing had happened.
-
-One line: `useCloseOnSuccess(editState?.ok, () => setEditing(null))`.
-
-Mine to own — I added that editor without wiring it up the way the other
-panels are.
-
-## The audit you asked for
-
-**50 components use `useFormState`. 36 already resolve properly.**
-
-Of the other 14:
-
-| | |
-|---|---|
-| **Genuinely broken** | 1 — the potluck editor |
-| **Worth your eyes** | 1 — `app/auth/pending/appeal.tsx` |
-| **Fine as they are** | 12 |
-
-The twelve break down as:
-
-**Redirect away, so nothing needs closing** — `join/form.tsx`,
-`arrive/form.tsx`, `login/form.tsx`. The action ends in `redirect()`.
-
-**A single button in a row, no panel** — `quick-approve`, `requests/row`,
-`members/controls`, `messages/row`, `checkin`, `quick-potluck`,
-`quick-arrival`, `potluck-board`, `gift`. The row re-renders from the server.
-Nothing to clear, nothing to close.
-
-So this was not systemic. It was the one editor I added recently.
-
-## The appeal panel
-
-`app/auth/pending/appeal.tsx` uses `Done`, which replaces the panel's contents
-— so it probably resolves fine. I would rather you looked at it than take my
-word for it.
-
-**To see it**, run `deploy/data/test-rejected.sql`, then sign in as
-`rejected@yopmail.com` (the link prints in your `npm run dev` terminal) and go
-to **http://localhost:3000/auth/pending**.
-
-Delete the row afterwards:
-
-```sql
-delete from members where email = 'rejected@yopmail.com';
+```ts
+const primary = joiningAs === 'student' ? university : personal;
 ```
+
+For a student the confirmation went to their @rockets.utoledo.edu address,
+which UToledo quarantines. It never reached them and nothing bounced.
+
+Approval and sign-in both use `members.email`, which migration 019 set to the
+personal address, so those arrived normally. That is why it looked like only
+signup was broken.
+
+Only students were affected. Alumni, spouses and community members were
+already getting the personal address.
+
+| Joining as | Went to | Goes to now |
+|---|---|---|
+| student | ut@rockets.utoledo.edu | ut.personal@gmail.com |
+| alumni | old@gmail.com | unchanged |
+| spouse | spouse@gmail.com | unchanged |
+| community | friend@gmail.com | unchanged |
+
+## The fix
+
+`const primary = personal || university;`
+
+Same rule as `contactEmail()` and as sign-in. The university address still
+identifies them and still signs them in. We just do not write to it.
+
+The token is issued against the same address, and `verify` matches on any of a
+member's addresses, so nothing else needed changing.
 
 ## A doctor check
 
-**"panels close themselves once their action succeeds"** — flags any component
-with an `editing`/`open`/`show`/`expanded` state and no `useCloseOnSuccess`
-call.
+**"signup writes to the address we can reach"** fails if that branch comes
+back. Verified in both directions.
 
-It matches the **call**, not the import: removing the call while leaving the
-import is precisely how this would come back, and my first version of the
-check was fooled by exactly that. Verified both ways.
+## For anyone stuck
+
+People who signed up and got nothing already have a pending account. Once this
+is deployed they can go to `/auth/login`, enter either address, and the link
+will reach them. No need to sign up again.

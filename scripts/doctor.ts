@@ -461,6 +461,19 @@ async function main() {
   else bad(`these read form state without optional chaining: ${unguarded.join(', ')}`,
            'A timed-out action white-screens the page. Use state?.error.');
 
+  // Nothing we send should be addressed to a @utoledo.edu address. The
+  // university quarantines mail from a domain it does not recognise, so it
+  // arrives nowhere and reports nothing. This caught the signup confirmation,
+  // which went to the university address while approval and sign-in did not.
+  const authSrc = read('app/actions/auth.ts') ?? '';
+  if (/=\s*joiningAs === 'student' \? university/.test(authSrc)) {
+    bad('signup emails the university address',
+        'UToledo quarantines it, so the confirmation never arrives. '
+        + 'Send to the personal address, as sign-in does.');
+  } else {
+    ok('signup writes to the address we can reach');
+  }
+
   // Behind nginx the app sees 127.0.0.1:3001, so a redirect built from the
   // request origin sends people to localhost — with the token already spent.
   const verifySrc = read('app/auth/verify/route.ts') ?? '';
