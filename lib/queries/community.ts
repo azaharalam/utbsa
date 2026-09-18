@@ -180,7 +180,7 @@ export async function assignArrival(actor: Member, arrivalId: string, memberId: 
   await sendMail({
     to: volunteer.email,
     subject: `Can you meet ${arrival.full_name.split(' ')[0]} at the airport?`,
-    text: `Assalamu alaikum ${volunteer.full_name.split(' ')[0]},\n\n`
+    text: `Hello ${volunteer.full_name.split(' ')[0]},\n\n`
         + `${actor.full_name} has put your name down to meet someone arriving in Toledo.\n\n`
         + `${arrival.full_name} lands at ${arrival.airport} on `
         + `${new Date(arrival.arriving_on).toLocaleDateString('en-US',

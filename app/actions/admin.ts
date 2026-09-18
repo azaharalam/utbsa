@@ -7,8 +7,9 @@ import * as Tokens from '@/lib/queries/tokens';
 import { sql } from '@/lib/db';
 import * as Content from '@/lib/queries/content';
 import * as Potluck from '@/lib/queries/potluck';
-import { sendMail, approvalEmail, magicLinkEmail } from '@/lib/mail';
+import { sendMail, approvalEmail, magicLinkEmail, welcomeEmail } from '@/lib/mail';
 import { audit } from '@/lib/audit';
+import { isEmail, isUniversityEmail } from '@/lib/emails';
 import type { MemberStatus } from '@/lib/types';
 
 export type FormState = { error?: string; ok?: string };
@@ -24,6 +25,51 @@ function slugify(s: string) {
  * approval queue. Usually a mistyped address — in which case this will not
  * arrive either, and the answer is to correct the address first.
  */
+/**
+ * Add somebody by hand, then tell them.
+ *
+ * The account is created whether or not the email goes out: an officer typing
+ * details off a sign-up sheet has done the work, and losing it because the
+ * mail server hiccupped would mean typing it again. If the send fails we say
+ * so and they can resend from the members list.
+ */
+export async function addMemberByOfficer(_prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await requireAdmin();
+  try {
+    const email = String(fd.get('personal_email') ?? '').trim();
+    if (!isEmail(email)) return { error: 'That email address does not look right.' };
+    if (isUniversityEmail(email)) {
+      return {
+        error: 'Use a personal address, not a UToledo one. '
+             + 'The university holds back our mail, so nothing would reach them.',
+      };
+    }
+
+    const member = await Members.createByOfficer(me, {
+      full_name: String(fd.get('full_name') ?? ''),
+      personal_email: email,
+      phone: String(fd.get('phone') ?? '') || null,
+      is_student: fd.get('is_student') === 'on',
+    });
+
+    try {
+      const token = await Tokens.issueToken(member.email, 'login');
+      await sendMail({ to: member.email, ...welcomeEmail(member.full_name, token, me.full_name) });
+    } catch (e) {
+      console.error('welcome email failed:', (e as Error).message);
+      revalidatePath('/admin/members');
+      return {
+        ok: `${member.full_name} added, but the welcome email did not send. `
+          + `Use "Send it again" under Approvals once mail is working.`,
+      };
+    }
+
+    revalidatePath('/admin/members');
+    revalidatePath('/admin/approvals');
+    return { ok: `${member.full_name} added. We have emailed ${member.email}.` };
+  } catch (e) { return { error: (e as Error).message }; }
+}
+
 export async function resendConfirmation(_prev: FormState, fd: FormData): Promise<FormState> {
   const me = await requireAdmin();
   try {

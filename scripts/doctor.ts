@@ -477,6 +477,35 @@ async function main() {
         'A mistyped address would make somebody disappear entirely.');
   }
 
+  // A search box that needs a button press or an Enter key, with nothing on
+  // screen saying so, reads as broken — people type and wait.
+  const searchForms = walk(join(root, 'app'))
+    .filter((f: string) => f.endsWith('.tsx'))
+    .filter((f: string) => {
+      const src = readFileSync(f, 'utf8');
+      if (!/name="q"|aria-label="Search/.test(src)) return false;
+      const live = src.includes('onChange') && src.includes('useState');
+      const hasButton = src.includes('type="submit"');
+      return !live && !hasButton;
+    })
+    .map((f: string) => f.replace(root + '/', ''));
+  if (!searchForms.length) ok('search boxes filter as you type, or have a button');
+  else bad(`these search on Enter with nothing to say so: ${searchForms.join(', ')}`,
+           'Filter on change, or add a submit button.');
+
+  // A sign-in link that reflects an arbitrary destination is an open
+  // redirect: send somebody a link that signs them in and bounces them
+  // somewhere that looks like us and asks for something.
+  const verifySrc2 = read('app/auth/verify/route.ts') ?? '';
+  if (verifySrc2.includes('next')) {
+    if (/DESTINATIONS\s*[:\[]/.test(verifySrc2) || verifySrc2.includes('DESTINATIONS[')) {
+      ok('the sign-in link only redirects to places we named');
+    } else {
+      bad('the verify route reflects an arbitrary next parameter',
+          'Map it through a fixed list of internal paths instead.');
+    }
+  }
+
   // Nothing we send should be addressed to a @utoledo.edu address. The
   // university quarantines mail from a domain it does not recognise, so it
   // arrives nowhere and reports nothing. This caught the signup confirmation,

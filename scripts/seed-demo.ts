@@ -519,7 +519,7 @@ async function seed() {
   await sql`
     insert into contact_messages (name, email, subject, message)
     values ('Shahriar Kabir', ${'shahriar' + DOMAIN}, 'Arriving in January',
-            'Assalamu alaikum. I am starting my MS in Spring and land on the 8th. Is airport pickup possible? I have two large suitcases.')`;
+            'Hello. I am starting my MS in Spring and land on the 8th. Is airport pickup possible? I have two large suitcases.')`;
 
   // ── summary ──────────────────────────────────────────────
   const [{ n: mcount }] = await sql<any[]>`

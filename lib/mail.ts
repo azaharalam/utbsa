@@ -88,9 +88,37 @@ export function magicLinkEmail(token: string, isSignup: boolean) {
   };
 }
 
+/**
+ * Somebody on the e-board put this person's details in by hand, usually from
+ * a sign-up sheet at an event.
+ *
+ * The link both signs them in and lands them on their profile, because the
+ * alternative is telling somebody who has never seen the site to find a page
+ * on it. They did not ask for this account, so it says who added them and
+ * what to do if that is a mistake.
+ */
+export function welcomeEmail(name: string, token: string, addedBy: string) {
+  const url = `${site()}/auth/verify?token=${token}&next=profile`;
+  return {
+    subject: 'Your UTBSA account — UTBSA',
+    text:
+      `Hello ${name},\n\n`
+      + `${addedBy} has set up a UTBSA account for you, using the details you `
+      + `gave us. You do not need to sign up.\n\n`
+      + `Open this link to finish your profile:\n\n${url}\n\n`
+      + `It works once and expires in 30 minutes. If it has expired by the time `
+      + `you get to it, go to ${site()}/auth/login and we will send another.\n\n`
+      + `There is no password. Every time you sign in, we email you a link.\n\n`
+      + `Your profile is where you add your department, your phone number, and `
+      + `decide what other members can see. None of it is required.\n\n`
+      + `If you did not expect this, reply and tell us and we will remove the `
+      + `account.\n\n— UTBSA`,
+  };
+}
+
 export function approvalEmail(name: string) {
   return {
     subject: 'You are in — UTBSA',
-    text: `Assalamu alaikum ${name},\n\nYour UTBSA membership has been approved. Sign in here:\n\n${site()}/auth/login\n\nTake a minute to fill in your profile so other members can find you.`,
+    text: `Hello ${name},\n\nYour UTBSA membership has been approved. Sign in here:\n\n${site()}/auth/login\n\nTake a minute to fill in your profile so other members can find you.`,
   };
 }

@@ -81,7 +81,7 @@ export async function inviteToHousehold(actor: Member, targetId: string, message
   await sendMail({
     to: target.email,
     subject: `${actor.full_name} would like to link your UTBSA accounts`,
-    text: `Assalamu alaikum ${target.full_name.split(' ')[0]},\n\n`
+    text: `Hello ${target.full_name.split(' ')[0]},\n\n`
         + `${actor.full_name} has asked to link your UTBSA accounts as one household.\n\n`
         + `That means one of you answers an invitation for both, and you get one email `
         + `per event instead of two. It does not affect dues — those stay separate.\n\n`

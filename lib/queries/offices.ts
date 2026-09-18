@@ -103,7 +103,7 @@ export async function assignOffice(
     await sendMail({
       to: m.email,
       subject: `You are now ${o.title.trim()} — UTBSA`,
-      text: `Assalamu alaikum ${m.full_name.split(' ')[0]},\n\n`
+      text: `Hello ${m.full_name.split(' ')[0]},\n\n`
           + `You have taken office as ${o.title.trim()}.\n\n`
           + `${grants.description}\n\n`
           + `Nothing about how you sign in has changed — use the same email address `
@@ -152,7 +152,7 @@ export async function endOffice(actor: Member, officeId: string, reason: string)
   await sendMail({
     to: office.email,
     subject: `Your term as ${office.title} has ended — UTBSA`,
-    text: `Assalamu alaikum ${office.full_name.split(' ')[0]},\n\n`
+    text: `Hello ${office.full_name.split(' ')[0]},\n\n`
         + `Your term as ${office.title} has ended. Thank you for the work.\n\n`
         + `Your account is unchanged and you remain a member — you simply no longer `
         + `have the extra access the office carried.\n\n— UTBSA`,
@@ -209,7 +209,7 @@ export async function resignTo(
   await sendMail({
     to: office.email,
     subject: `You have handed over ${office.title} — UTBSA`,
-    text: `Assalamu alaikum ${office.full_name.split(' ')[0]},\n\n`
+    text: `Hello ${office.full_name.split(' ')[0]},\n\n`
         + `You have handed the office of ${office.title} to ${successor?.full_name}. `
         + `Thank you for your term.\n\n`
         + `Your account is unchanged and you remain a member.\n\n— UTBSA`,
@@ -219,7 +219,7 @@ export async function resignTo(
     await sendMail({
       to: successor.email,
       subject: `You are now ${office.title} — UTBSA`,
-      text: `Assalamu alaikum ${successor.full_name.split(' ')[0]},\n\n`
+      text: `Hello ${successor.full_name.split(' ')[0]},\n\n`
           + `${office.full_name} has handed over, and you are now ${office.title}.\n\n`
           + `Sign in with the same email address you always use — there is no new `
           + `password, and nothing to look up. The extra sections appear once you do.\n\n`

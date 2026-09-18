@@ -90,7 +90,7 @@ export default async function Portal() {
         <Avatar name={me.full_name} url={me.photo_url} size={56} />
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-bold sm:text-3xl">
-            Assalamu alaikum, {firstName}
+            Hello, {firstName}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Pill tone={statusTone}>{me.status}</Pill>

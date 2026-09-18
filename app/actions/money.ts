@@ -144,7 +144,7 @@ export async function sendReminders(_p: FormState, fd: FormData): Promise<FormSt
 
       return {
         subject: 'UTBSA — a note about the semester',
-        text: `Assalamu alaikum ${r.full_name.split(' ')[0]},\n\n`
+        text: `Hello ${r.full_name.split(' ')[0]},\n\n`
             + `We ask students for $15 a semester. It covers food at our events for one person — the rest we raise from sponsors.\n\n`
             + `We have not seen yours yet.\n\n`
             + `To send it, use ${settings.pay_method_label}:\n\n`

@@ -34,9 +34,24 @@ function base(request: NextRequest): string {
  * for email links. The token is single-use and short-lived, which is what
  * makes it acceptable.
  */
+/**
+ * Where to land after signing in.
+ *
+ * Only an internal path, and only one we name. Reflecting an arbitrary `next`
+ * value would turn every sign-in link into an open redirect: send somebody a
+ * link that signs them in and bounces them to a site that looks like ours and
+ * asks for something.
+ */
+const DESTINATIONS: Record<string, string> = {
+  profile: '/portal/profile',
+  dues: '/portal/dues',
+  events: '/portal/events',
+};
+
 export async function GET(request: NextRequest) {
   const site = base(request);
   const token = request.nextUrl.searchParams.get('token');
+  const next = request.nextUrl.searchParams.get('next');
 
   if (!token) return NextResponse.redirect(`${site}/auth/login?error=missing`);
 
@@ -53,7 +68,9 @@ export async function GET(request: NextRequest) {
   await audit(member.id, 'auth.login');
 
   const dest =
-    member.status === 'pending' || member.status === 'rejected' ? '/auth/pending' : '/portal';
+    member.status === 'pending' || member.status === 'rejected'
+      ? '/auth/pending'
+      : (next && DESTINATIONS[next]) || '/portal';
 
   return NextResponse.redirect(`${site}${dest}`);
 }

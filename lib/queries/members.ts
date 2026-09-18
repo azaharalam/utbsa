@@ -66,6 +66,46 @@ export async function createPending(input: {
   return rows[0];
 }
 
+/**
+ * An officer adding somebody by hand, usually off a sign-up sheet.
+ *
+ * Created ACTIVE, not pending: an officer typing the details in is the
+ * vouching, and making them approve afterwards is the same job twice.
+ *
+ * But `email_verified_at` stays null. Nobody has proved they can read that
+ * address, and the officer typed it, so a transposed character produces an
+ * active account that can never be reached. Left unverified they show up
+ * under "Waiting to confirm", where a bad address is visible instead of
+ * silent, and the sign-in link confirms it the moment they click.
+ */
+export async function createByOfficer(actor: Member, input: {
+  full_name: string; personal_email: string;
+  phone?: string | null; is_student: boolean;
+}): Promise<Member> {
+  await assertAdmin(actor);
+
+  const email = input.personal_email.trim().toLowerCase();
+  const name = input.full_name.trim();
+  if (!name) throw new Error('A name is required.');
+  if (!email) throw new Error('An email address is required.');
+
+  const existing = await findByEmail(email);
+  if (existing) {
+    throw new Error(`${existing.full_name} already has an account with that address.`);
+  }
+
+  const rows = await sql<Member[]>`
+    insert into members (full_name, email, personal_email, phone,
+                         member_type, status, approved_at, in_directory)
+    values (${name}, ${email}, ${email}, ${input.phone?.trim() || null},
+            ${input.is_student ? 'student' : 'community'},
+            'active', now(), true)
+    returning *
+  `;
+  await trackedCreate(actor.id, 'members', rows[0].id, 'member.add_by_officer');
+  return rows[0];
+}
+
 /** An admin editing somebody else's record — always logged with the diff. */
 export async function adminUpdateMember(
   actor: Member, id: string, fields: Record<string, string | number | null>
